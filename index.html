@@ -1,0 +1,2110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>現場コマンダー</title>
+<meta name="description" content="MCLSのCSCATTTに沿って多数傷病者事故の指揮を学ぶ訓練ゲーム（教育用の架空シナリオ）">
+<meta name="theme-color" content="#10142a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="現場コマンダー">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0}
+body{font:14px/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=BIZ+UDPGothic:wght@400;700&family=DotGothic16&display=swap">
+<style>
+/* Layout: one-screen game. HUD (CSCATTT track + trust) on top, stage fills the rest. CSCA = debate scenes, TTT = turn-based aid-station simulation with the patient board in the middle and the turn button docked at the bottom. Single dark "night scene" look by design. */
+:root{
+  --night:#10142a; --panel:#1a2042; --panel-2:#232a55; --line:#353e74;
+  --fg:#eef0fb; --muted:#a3a9cf;
+  --siren:#ff3d5f; --weak:#ffae1f; --ok:#36d39a;
+  --paper:#f4f1e6; --paper-ink:#1b1b22; --paper-line:#d9d3bf; --paper-mute:#6a6656; --paper-blue:#3c3a96;
+  --tag-g:#2fae63; --tag-y:#efc12f; --tag-r:#e3343a; --tag-k:#0a0a0f; --tag-n:#8d8a7c;
+  --f-display:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;
+  --f-sys:"DotGothic16","BIZ UDPGothic",monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--night);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.7;margin:0;
+  background-image:radial-gradient(120% 60% at 50% -10%, #2a1e4a 0%, transparent 60%),repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 2px, transparent 2px 4px);}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--weak);outline-offset:2px}
+#app{height:100%;max-width:600px;margin:0 auto;display:flex;flex-direction:column;padding-inline:16px;padding-block:10px 12px;gap:10px}
+
+.hud[hidden]{display:none}
+.hud{display:grid;grid-template-columns:1fr auto auto;grid-template-areas:'track track track' 'hearts ev snd';align-items:center;gap:6px 8px}
+.track{grid-area:track}.hearts{grid-area:hearts}.evbtn#evbtn{grid-area:ev}.sndbtn{grid-area:snd}
+.track{display:flex;gap:3px;min-width:0}
+.track span{flex:1;text-align:center;font-family:var(--f-display);font-size:15px;padding:3px 0 1px;border-bottom:3px solid var(--line);color:var(--muted);line-height:1.2}
+.track span small{display:block;font-family:var(--f-body);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.track span.done{color:var(--fg);border-color:var(--ok)}
+.track span.now{color:var(--siren);border-color:var(--siren)}
+.hearts{display:flex;align-items:center;gap:4px;font-family:var(--f-sys);font-size:12px;color:var(--muted);min-width:0}
+.hearts i{width:10px;height:10px;transform:rotate(45deg);background:var(--siren);display:inline-block;margin-left:3px;flex:none}
+.hearts i.off{background:var(--line)}
+.sndbtn{min-width:4.6em}
+.sndbtn.on{border-color:var(--weak);color:var(--weak)}
+.evbtn{font-family:var(--f-sys);font-size:12px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 8px}
+#stage{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;overflow-y:auto;overflow-x:hidden}
+
+.talk{margin-top:auto;display:flex;flex-direction:column;gap:8px;cursor:pointer;user-select:none}
+.portrait{align-self:flex-start}
+.face{width:84px;height:84px;border-radius:50%;background:radial-gradient(circle at 50% 35%, var(--c) 0 38%, transparent 39%),radial-gradient(ellipse at 50% 105%, var(--c) 0 55%, transparent 56%);border:2px solid var(--c);position:relative;opacity:.95}
+.face b{position:absolute;bottom:-6px;right:-6px;font-family:var(--f-display);font-weight:400;font-size:20px;background:var(--night);border:2px solid var(--c);color:var(--c);width:36px;height:36px;border-radius:50%;display:grid;place-items:center}
+.box{background:var(--panel);border:2px solid var(--line);border-radius:6px;padding:12px 14px 10px;position:relative;min-height:128px}
+.name{display:inline-block;font-weight:700;font-size:14px;background:var(--c,var(--muted));color:var(--night);padding:1px 10px;border-radius:3px;margin-bottom:6px}
+.name small{font-weight:400;margin-left:6px}
+.line{margin:0;font-size:17px;min-height:3.4em;white-space:pre-wrap}
+.nxt{position:absolute;right:12px;bottom:6px;color:var(--weak);font-size:13px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.narr .box{border-style:dashed;background:transparent}
+.narr .line{color:#d9dcf2}
+
+.title{margin:auto 0;display:flex;flex-direction:column;gap:18px;padding-block:20px}
+.kicker{font-family:var(--f-sys);color:var(--weak);letter-spacing:.12em;font-size:13px}
+.title h1{font-family:var(--f-display);font-weight:400;font-size:clamp(46px,14vw,78px);line-height:1;margin:0;letter-spacing:-.02em}
+.title h1 em{font-style:normal;color:var(--siren);display:block;font-size:.5em;letter-spacing:.06em;margin-top:8px}
+.how{display:grid;gap:8px;font-size:14px;color:var(--muted)}
+.how div{display:grid;grid-template-columns:3.6em 1fr;gap:8px}
+.how b{font-family:var(--f-display);font-weight:400;color:var(--fg)}
+.primary{background:var(--siren);color:#fff;border:0;border-radius:4px;padding:14px 18px;font-family:var(--f-display);font-size:19px;letter-spacing:.06em}
+.primary:disabled{opacity:.4}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:4px;padding:10px 14px}
+.sm{padding:4px 10px;font-size:13px}
+.btns{display:flex;flex-direction:column;gap:8px}
+
+.chap{margin:auto 0;cursor:pointer;display:flex;flex-direction:column;gap:6px;padding-block:24px;border-top:2px solid var(--siren);border-bottom:2px solid var(--siren);animation:slidein .5s ease-out}
+.chap .no{font-family:var(--f-sys);color:var(--muted);font-size:13px}
+.chap .big{font-family:var(--f-display);font-size:96px;line-height:1;color:var(--siren)}
+.chap h2{font-family:var(--f-display);font-weight:400;font-size:34px;margin:0;line-height:1.2}
+.chap p{margin:4px 0 0;color:var(--muted);font-size:15px}
+.mode{align-self:flex-start;font-family:var(--f-sys);font-size:12px;border:1px solid var(--weak);color:var(--weak);padding:0 8px;border-radius:3px}
+@keyframes slidein{from{transform:translateX(30px);opacity:.2}to{transform:none;opacity:1}}
+
+.get{margin-top:auto;cursor:pointer;display:flex;flex-direction:column;gap:8px}
+.get .hd{font-family:var(--f-display);color:var(--weak);font-size:20px}
+.evcard{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--weak);border-radius:4px;padding:10px 12px}
+.evcard b{display:block;font-size:15px}
+.evcard span{font-size:14px;color:var(--muted)}
+
+.choice{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.q{font-weight:700;font-size:17px}
+.opt{text-align:left;background:var(--panel);border:2px solid var(--line);border-radius:6px;padding:12px 14px;font-size:15px}
+.opt.bad{border-color:var(--siren);opacity:.6}
+.opt.good{border-color:var(--ok)}
+.fb{background:var(--panel-2);border-radius:6px;padding:10px 12px;font-size:15px}
+.fb.bad{border-left:5px solid var(--siren)} .fb.good{border-left:5px solid var(--ok)}
+
+.debate{flex:1;display:flex;flex-direction:column;gap:10px;min-height:0}
+.dhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.dlabel{font-family:var(--f-display);color:var(--night);background:var(--siren);padding:0 8px;font-size:14px;transform:skewX(-10deg)}
+.dtitle{font-weight:700;flex:1;min-width:0}
+.dleft{font-family:var(--f-sys);font-size:12px;color:var(--weak)}
+.arena{flex:1;min-height:210px;position:relative;border:2px solid var(--line);border-radius:6px;background:repeating-linear-gradient(115deg, rgba(255,61,95,.06) 0 14px, transparent 14px 28px), var(--panel);padding:14px;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.shake{animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.spk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:6px}
+.spk i{width:26px;height:26px;border-radius:50%;border:2px solid var(--c);color:var(--c);font-style:normal;font-family:var(--f-display);display:grid;place-items:center;font-size:13px}
+.stmt{font-size:clamp(19px,5.4vw,24px);font-weight:700;line-height:1.55;margin:0;animation:fly .45s ease-out}
+@keyframes fly{from{transform:translateX(40%) skewX(-8deg);opacity:0}to{transform:none;opacity:1}}
+.weak{background:none;border:0;padding:0 2px;color:var(--weak);font-weight:700;text-decoration:underline wavy;text-underline-offset:5px;font-size:inherit;line-height:inherit}
+.weak.done{color:var(--ok);text-decoration:line-through;cursor:default}
+.bar{position:absolute;left:0;bottom:0;height:3px;background:var(--siren);width:100%;transform-origin:left;animation:bar linear forwards}
+.paused .bar{animation-play-state:paused}
+@keyframes bar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.retort{position:absolute;left:10px;right:10px;bottom:12px;background:var(--night);border:1px solid var(--siren);border-radius:4px;padding:6px 10px;font-size:14px}
+.ctrl{display:flex;align-items:center;gap:8px}
+.ctrl button{background:var(--panel);border:1px solid var(--line);border-radius:4px;width:44px;height:36px}
+.dots{display:flex;gap:5px;flex:1;justify-content:center}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.dots i.on{background:var(--fg)}
+.guide{font-size:13px;color:var(--muted)}
+.bullets{display:flex;flex-wrap:wrap;gap:6px}
+.bul{background:var(--panel);border:2px solid var(--line);border-radius:999px;padding:6px 12px;font-size:14px;font-weight:700}
+.bul.sel{border-color:var(--weak);background:var(--weak);color:var(--night)}
+
+/* Ready / dojo sorting */
+.ready{margin:auto 0;display:flex;flex-direction:column;gap:12px}
+.ready h2{font-family:var(--f-display);font-weight:400;font-size:28px;margin:0;line-height:1.25}
+.ready ul{margin:0;padding-left:1.2em;color:var(--muted);font-size:15px}
+.sort{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
+.timer{font-family:var(--f-sys);font-size:22px;font-variant-numeric:tabular-nums}
+.timer.low{color:var(--siren)}
+.srow{display:flex;align-items:center;gap:10px;font-family:var(--f-sys);font-size:13px;color:var(--muted)}
+.srow span{flex:1}
+.deck{flex:1;min-height:200px;display:grid;place-items:center;position:relative}
+.tag{width:min(100%,360px);background:var(--paper);color:var(--paper-ink);border-radius:4px;padding:12px 14px 14px;position:relative;touch-action:none;user-select:none;cursor:grab;box-shadow:0 10px 24px rgba(0,0,0,.45);transition:transform .28s ease, opacity .28s ease;animation:deal .25s ease-out}
+.tag.drag{transition:none;cursor:grabbing}
+.tag::before{content:"";position:absolute;top:10px;right:12px;width:12px;height:12px;border-radius:50%;background:var(--night)}
+@keyframes deal{from{transform:translateY(-30px) rotate(-3deg);opacity:0}to{transform:none;opacity:1}}
+.tg-h{display:flex;align-items:baseline;gap:10px;border-bottom:2px solid var(--paper-line);padding-bottom:4px;margin-bottom:6px;padding-right:24px}
+.tg-h b{font-family:var(--f-display);font-weight:400;font-size:30px;line-height:1}
+.tg-h span{font-size:14px;flex:1}
+.tobs{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:15px;margin:0}
+.tobs dt{color:var(--paper-mute);font-size:13px;padding-top:2px}
+.tobs dd{margin:0;font-weight:700;min-width:0}
+.tg-n{margin:6px 0 0;font-size:14px;border-top:1px dashed var(--paper-line);padding-top:6px}
+.flash{min-height:3.3em;font-size:14px;background:var(--panel);border-radius:4px;padding:6px 10px;border-left:5px solid var(--line)}
+.flash.ok{border-left-color:var(--ok)} .flash.ng{border-left-color:var(--siren)}
+.flash b{margin-right:6px}
+.bins{display:grid;gap:6px;grid-template-columns:repeat(4,1fr)}
+.bin{border:2px solid transparent;border-radius:6px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;min-height:76px;justify-content:center;color:#fff;transition:transform .12s}
+.bin b{font-family:var(--f-display);font-weight:400;font-size:20px;line-height:1.2}
+.bin small{font-size:11px;opacity:.9}
+.bin .cnt{font-family:var(--f-sys);font-size:12px}
+.bin.hot{border-color:#fff;transform:scale(1.04)}
+.bin.pulse{animation:pulse .3s}
+@keyframes pulse{50%{transform:scale(1.08)}}
+.s0{background:var(--tag-k);border-color:#555;color:#fff} .s1{background:var(--tag-r);color:#fff} .s2{background:var(--tag-y);color:#222} .s3{background:var(--tag-g);color:#fff}
+.res{display:grid;gap:6px}
+.res div{background:var(--panel-2);border-radius:4px;padding:8px 10px;font-size:14px;border-left:5px solid var(--siren)}
+
+/* Aid-station simulation */
+.sim{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
+.simtop{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.clock{font-family:var(--f-sys);font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
+.turn{font-family:var(--f-sys);font-size:13px;color:var(--muted)}
+.nexta{font-size:12px;color:var(--weak);flex:1;text-align:right;min-width:0}
+.rrow{display:flex;flex-wrap:wrap;gap:4px;font-size:12px}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:1px 9px;white-space:nowrap}
+.chip b{font-variant-numeric:tabular-nums}
+.chip.zero{opacity:.45}
+.plist{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-bottom:4px}
+.grp{font-family:var(--f-sys);font-size:12px;color:var(--muted);margin-top:4px}
+.pc{width:100%;text-align:left;background:var(--paper);color:var(--paper-ink);border:0;border-left:12px solid var(--tc);border-radius:4px;padding:6px 10px 7px;display:grid;grid-template-columns:auto 1fr auto;gap:0 10px;align-items:baseline}
+.pc .id{font-family:var(--f-display);font-size:24px;line-height:1.1;grid-row:span 3}
+.pc .ag{font-size:13px;font-weight:700}
+.pc .ago{font-size:11px;color:var(--paper-mute);font-family:var(--f-sys)}
+.pc .vl{grid-column:2/4;font-size:12.5px;font-variant-numeric:tabular-nums;line-height:1.5}
+.pc .vl.unk{color:var(--paper-mute)}
+.pc .who{grid-column:2/4;font-size:12px;color:var(--paper-blue);font-weight:700;line-height:1.5}
+.pc.cpa{opacity:.7}
+.simfoot{display:flex;gap:6px}
+.simfoot .ghost{padding:10px 10px;font-size:14px}
+.simfoot .primary{flex:1;font-size:17px;padding:12px}
+.psh{gap:8px}
+.psh .loc{font-size:12px;color:var(--muted)}
+.vgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.vgrid div{background:var(--panel-2);border-radius:3px;padding:2px 6px;font-size:11px;color:var(--muted)}
+.vgrid b{display:block;font-size:17px;color:var(--fg);font-variant-numeric:tabular-nums;line-height:1.3}
+.vgrid b.red{color:var(--siren)}
+.finds{margin:0;padding-left:1.1em;font-size:14px}
+.tagbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tagbtns button{border:2px solid transparent;border-radius:4px;padding:8px 0;font-weight:700}
+.tagbtns button.on{border-color:#fff;box-shadow:0 0 0 2px var(--weak)}
+.stt{display:flex;flex-wrap:wrap;gap:4px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.act{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:7px 9px;text-align:left;font-size:14px;font-weight:700;line-height:1.35}
+.act small{display:block;color:var(--muted);font-size:11px;font-weight:400}
+.act.dis{opacity:.5}
+.act.dis small{color:var(--weak)}
+.who-l{display:grid;gap:4px;font-size:14px}
+.who-l div{display:flex;align-items:center;gap:8px;background:var(--panel-2);border-radius:4px;padding:4px 8px}
+.who-l span{flex:1;min-width:0}
+.lbl{font-family:var(--f-sys);font-size:12px;color:var(--muted)}
+.pick{display:grid;gap:6px}
+.pick button{text-align:left;background:var(--panel-2);border:2px solid var(--line);border-radius:4px;padding:6px 10px;font-size:14px}
+.pick button.on{border-color:var(--weak)}
+.pick button:disabled{opacity:.4}
+.err{color:var(--siren);font-size:13px;min-height:1.2em;margin:0}
+.msgs{display:grid;gap:5px;font-size:14px;margin:0;padding:0;list-style:none}
+.msgs li{background:var(--panel-2);border-radius:4px;padding:5px 9px}
+.msgs li.bad{border-left:4px solid var(--siren)}
+.msgs li.arr{border-left:4px solid var(--weak)}
+.prow{background:var(--panel);border-radius:4px;padding:8px 10px;font-size:14px;border-left:8px solid var(--tc)}
+.prow b{font-size:15px}
+.prow .o{display:block;font-weight:700}
+.prow .tip{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.prow .lg{display:block;color:var(--muted);font-size:12px;font-family:var(--f-sys);margin-top:4px;line-height:1.5}
+
+.ov{position:fixed;inset:0;background:rgba(6,8,20,.72);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.sheet{background:var(--panel);border:2px solid var(--line);border-radius:8px;max-width:568px;width:100%;max-height:86%;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.sheet h3{margin:0;font-family:var(--f-display);font-weight:400;font-size:20px;color:var(--weak)}
+.sheet p{margin:0}
+.evlist{display:grid;gap:8px}
+@keyframes hitf{from{opacity:.75}to{opacity:0}}
+.hitflash{position:fixed;inset:0;background:radial-gradient(circle,#fff 0%,rgba(255,174,31,.6) 40%,transparent 75%);pointer-events:none;z-index:29;animation:hitf .45s ease-out forwards}
+#stamp{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;z-index:30}
+#stamp span{font-family:var(--f-display);font-size:clamp(70px,24vw,140px);color:var(--siren);-webkit-text-stroke:3px #fff;transform:rotate(-8deg);animation:stamp .5s cubic-bezier(.2,1.6,.4,1) .12s both;text-shadow:6px 6px 0 rgba(0,0,0,.5)}
+@keyframes stamp{from{transform:scale(2.6) rotate(-14deg);opacity:0}to{transform:scale(1) rotate(-8deg);opacity:1}}
+#toast{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--weak);color:var(--night);font-weight:700;padding:6px 14px;border-radius:4px;z-index:40;font-size:14px;max-width:90%}
+
+.result{display:flex;flex-direction:column;gap:12px;padding-block:8px 16px}
+.rank{font-family:var(--f-display);font-size:110px;line-height:1;color:var(--siren)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stats div{background:var(--panel);border-radius:4px;padding:8px;text-align:center;font-size:12px;color:var(--muted)}
+.stats b{display:block;font-size:22px;color:var(--fg);font-variant-numeric:tabular-nums}
+.recap{display:grid;gap:4px;font-size:14px}
+.recap div{display:grid;grid-template-columns:2.2em 1fr;gap:6px}
+.recap b{font-family:var(--f-display);font-weight:400;color:var(--siren)}
+.note{font-size:12px;color:var(--muted)}
+/* Portraits */
+.pimg{width:150px;aspect-ratio:4/5;object-fit:cover;object-position:top;border-radius:6px;border:3px solid var(--c,var(--line));background:#f7f5ef;display:block;animation:slidein .35s ease-out}
+.pimg.sm{width:96px;--c:var(--ok)}
+.spk img{width:40px;height:40px;border-radius:50%;object-fit:cover;object-position:50% 12%;border:2px solid var(--c);background:#f7f5ef}
+/* Exploration */
+.explore{display:flex;flex-direction:column;gap:8px}
+.scene-wrap{overflow-x:auto;border-radius:6px;border:2px solid var(--line);-webkit-overflow-scrolling:touch}
+.scene{position:relative;width:max(100%,720px);cursor:crosshair}
+.scene img{width:100%;display:block;max-width:none;user-select:none;-webkit-user-drag:none}
+.hs{position:absolute;background:transparent;border:0;padding:0;border-radius:6px}
+.hs:focus-visible{outline:3px solid var(--weak)}
+.hs.done{outline:2px dashed var(--ok);background:rgba(54,211,154,.14)}
+.hs.done::after{content:"✓";position:absolute;top:4px;left:6px;font-weight:700;color:#fff;background:var(--ok);border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-size:13px}
+.ping{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border:3px solid #fff;border-radius:50%;pointer-events:none;animation:ping .6s ease-out forwards}
+@keyframes ping{from{transform:scale(.3);opacity:1}to{transform:scale(1.4);opacity:0}}
+.foundl{display:flex;flex-wrap:wrap;gap:4px}
+/* Interview */
+.iv{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.qa{display:grid;gap:6px}
+.qa div{background:var(--panel);border-radius:4px;padding:6px 10px;font-size:14px}
+.qa b{display:block;color:var(--muted);font-weight:400;font-size:12px}
+.qs{display:grid;gap:6px}
+/* Placement map */
+.mapwrap{overflow-x:auto;border-radius:6px;border:2px solid var(--line);background:var(--paper);-webkit-overflow-scrolling:touch}
+.mapwrap svg{display:block;width:100%;min-width:560px;height:auto}
+.slot{cursor:pointer}
+.slot:focus-visible circle.ring{stroke:var(--weak);stroke-width:4}
+.facs{display:flex;flex-wrap:wrap;gap:6px}
+.fac{display:flex;align-items:center;gap:6px;background:var(--panel);border:2px solid var(--line);border-radius:999px;padding:4px 12px 4px 4px;font-size:14px;font-weight:700}
+.fac i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:13px;background:var(--fc)}
+.fac.sel{border-color:var(--weak)}
+.fac.placed{opacity:.55}
+.mapinfo{min-height:2.6em;font-size:14px;background:var(--panel);border-radius:4px;padding:6px 10px}
+/* Scenario select */
+.scl{display:grid;gap:8px}
+.scc{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:6px}
+.sch{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.sch b{font-size:16px}
+.sch span{font-size:12px;color:var(--muted);font-family:var(--f-sys)}
+.scl2{display:flex;flex-wrap:wrap;gap:4px}
+.scb{display:flex;gap:6px}
+.scb button{flex:1;padding:8px 10px}
+.sm2{font-size:15px}
+/* Title */
+.ttl{display:flex;flex-direction:column;gap:12px;margin:auto 0;padding-block:6px}
+.ttl-h{display:flex;flex-direction:column;gap:2px}
+.ttl-h h1{font-family:var(--f-display);font-weight:400;font-size:clamp(30px,9vw,44px);line-height:1.05;margin:0;letter-spacing:.01em}
+.ttl-h span{font-family:var(--f-sys);font-size:12px;color:var(--muted);letter-spacing:.08em}
+.ttl-hero{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:16/9;max-width:100%;background:var(--panel)}
+.ttl-hero img{width:100%;height:100%;object-fit:cover;display:block;animation:fadein .35s ease-out}
+@keyframes fadein{from{opacity:.3}to{opacity:1}}
+.ttl-cap{position:absolute;inset:auto 0 0 0;padding:28px 14px 10px;background:linear-gradient(transparent,rgba(8,10,24,.88));display:flex;flex-direction:column;gap:0}
+.ttl-cap b{font-size:20px;line-height:1.3;color:#fff}
+.ttl-cap span{font-size:12px;color:#d3d6ee}
+.ttl-cap .ttl-no{font-family:var(--f-sys);color:var(--weak);letter-spacing:.1em}
+.ttl-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.ttl-tab{background:none;border:0;padding:0;display:flex;flex-direction:column;gap:3px;align-items:stretch;opacity:.55;transition:opacity .15s}
+.ttl-tab img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;border:2px solid transparent;display:block}
+.ttl-tab span{font-size:10px;text-align:center;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttl-tab.on{opacity:1}
+.ttl-tab.on img{border-color:var(--siren)}
+.ttl-tab.on span{color:var(--fg)}
+.ttl-learn{display:flex;flex-wrap:wrap;align-content:flex-start;gap:4px 12px;font-size:13px;color:var(--muted);min-height:3.4em}
+.ttl-learn span::before{content:"";display:inline-block;width:5px;height:5px;background:var(--siren);border-radius:50%;margin-right:6px;vertical-align:middle}
+.ttl-act{display:grid;grid-template-columns:2fr 1fr;gap:8px}
+.ttl-act .ghost{padding:10px}
+.ttl-foot{display:flex;gap:18px;justify-content:center}
+.lnk.on{color:var(--weak)}
+.lnk{background:none;border:0;color:var(--muted);font-size:13px;text-decoration:underline;text-underline-offset:3px;padding:4px}
+/* Guide */
+#guide{position:fixed;left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top,0px));width:min(568px,calc(100% - 24px));z-index:35;background:var(--weak);color:var(--night);border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:14px;line-height:1.55}
+#guide.bot{top:auto;bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+#guide b{grid-column:1/-1;font-size:12px;font-family:var(--f-sys);letter-spacing:.06em}
+#guide p{margin:0}
+#guide .gbtns{display:flex;flex-direction:column;gap:4px;justify-content:center}
+#guide button{background:var(--night);color:var(--fg);border:0;border-radius:4px;padding:5px 10px;font-size:13px;white-space:nowrap}
+#guide button.sk{background:transparent;color:var(--night);text-decoration:underline;padding:2px 4px}
+.glow{position:relative;z-index:1;box-shadow:0 0 0 3px var(--weak),0 0 18px 4px rgba(255,174,31,.6)!important;animation:glow 1.1s ease-in-out infinite}
+@keyframes glow{50%{box-shadow:0 0 0 3px var(--weak),0 0 4px 1px rgba(255,174,31,.3)!important}}
+.gchk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.ttl-resume{background:var(--panel);border:1px solid var(--weak);border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:10px;text-align:left;width:100%}
+.ttl-resume span{flex:1;min-width:0;font-size:13px;color:var(--muted);line-height:1.4}
+.ttl-resume span b{display:block;color:var(--fg);font-size:15px}
+.ttl-resume i{font-style:normal;color:var(--weak);font-weight:700;white-space:nowrap}
+/* Card tray */
+.tray{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:grid;gap:6px}
+.tray-h{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.tray-h b{color:var(--weak);font-family:var(--f-sys)}
+.tray-l{display:flex;flex-wrap:wrap;gap:6px}
+.tcard{display:flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--weak);border-radius:4px;padding:4px 10px 4px 6px;font-size:13px;font-weight:700;text-align:left}
+.tcard i{font-style:normal;font-family:var(--f-sys);font-size:10px;color:var(--night);background:var(--weak);border-radius:2px;padding:0 4px}
+.tcard.new{animation:cardin .5s cubic-bezier(.2,1.6,.4,1);border-color:var(--weak);box-shadow:0 0 12px rgba(255,174,31,.5)}
+@keyframes cardin{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+
+<div id="app">
+  <header class="hud">
+    <div class="track" id="track"></div>
+    <div class="hearts" id="hearts"></div>
+    <button class="evbtn" id="evbtn" type="button">根拠カード 0</button>
+    <button class="evbtn sndbtn" id="sndbtn" type="button" aria-label="BGM">♪ オフ</button>
+  </header>
+  <main id="stage"></main>
+</div>
+<div id="stamp" hidden></div>
+<div id="toast" hidden></div>
+
+<script>
+const CS=[['C','指揮','Command'],['S','安全','Safety'],['C','情報伝達','Communication'],['A','評価','Assessment'],['T','トリアージ','Triage'],['T','治療','Treatment'],['T','搬送','Transport']];
+const CH={
+  you:{n:'あなた',r:'救急隊長',k:'隊',c:'#5b8cff'},
+  sak:{n:'佐倉',r:'救急隊員',k:'佐',c:'#ff7a59',img:{n:'img/sakura_n.webp',s:'img/sakura_s.webp',a:'img/sakura_a.webp'}},
+  oni:{n:'大西',r:'機関員',k:'西',c:'#4cc9a7',img:{n:'img/oni_n.webp',a:'img/oni_a.webp',s:'img/oni_s.webp'}},
+  sakaki:{n:'榊',r:'消防隊長',k:'榊',c:'#e0b84a',img:{n:'img/sakaki_n.webp'}},
+  tad:{n:'田所',r:'応援救急隊長',k:'田',c:'#b48cff',img:{n:'img/tad_n.webp'}},
+  mak:{n:'真壁',r:'DMAT医師',k:'真',c:'#7fd1ff',img:{n:'img/mak_n.webp'}},
+  cmd:{n:'指令センター',r:'無線',k:'指',c:'#a3a9cf',img:{n:'img/cmd_n.webp'}},
+  drv:{n:'運転手',r:'傷病者A',k:'運',c:'#c9a27e',img:{n:'img/drv_n.webp'}}
+};
+const EV={
+  ev_dispatch:['出場指令','県道 峠トンネル西側出口付近、マイクロバス横転。乗客多数の模様。'],
+  ev_weather:['現場の天候','曇り。今日は朝から雨は降っていない。路面は乾燥。'],
+  ev_fuel:['路面の油膜','バス後部から路面に虹色の油膜が広がり、強い軽油臭。燃料漏れ。'],
+  ev_3s:['安全の3S','Self（自分）→Scene（現場）→Survivor（傷病者）の順に安全を確保する。'],
+  ev_witness:['運転手の証言：人数','「乗客は8人。私を入れて9人です」'],
+  ev_smoke:['エンジン部の白煙','エンジン部から白煙。エンジンはかかったまま（着火源になりうる）。'],
+  ev_wire:['垂れ下がった電線','電柱から電線が垂れ下がり、バスの車体に触れている。車体に通電しているおそれ。'],
+  ev_glass:['散乱したガラス','車体の周囲に割れたガラスが散乱。保護具の着装が必要。'],
+  ev_cliff:['ガードレールの外','ガードレールの外は急斜面。活動中の転落に注意。'],
+  ev_trapped:['運転手の証言：取り残し','「一番後ろの男性が、座席に脚を挟まれて動けないと…」'],
+  ev_insulin:['運転手の証言：持病','「年配の女性が、インスリンを打っていると話していました」'],
+  ev_methane:['METHANE','M 宣言／E 正確な場所／T 事故種別／H 危険要因／A 進入経路／N 傷病者数／E 必要な応援']
+};
+const TAGN=['黒','赤','黄','緑'], TAGC=['var(--tag-k)','var(--tag-r)','var(--tag-y)','var(--tag-g)'];
+const CHEAT={
+  start:['START法','<p>1 歩行可 → <b>緑</b></p><p>2 呼吸なし → 気道確保。それでも呼吸なし → <b>黒</b>／呼吸出現 → <b>赤</b></p><p>3 呼吸数 30以上 または 10未満 → <b>赤</b></p><p>4 橈骨動脈触知不可 または CRT 2秒超 → <b>赤</b></p><p>5 従命不可 → <b>赤</b></p><p>6 どれにも該当しない → <b>黄</b></p>'],
+  sim:['基準カード',`<p class="lbl">トリアージ（このゲームの判定）</p>
+   <p>心肺停止 → <b>黒</b>。次のどれかに当たれば <b>赤</b>：JCS 2桁以上／呼吸数30以上か10未満／脈拍120以上か50未満／収縮期血圧90未満か200以上／SpO2 90%未満／解剖学的に重症の所見（胸郭動揺、骨盤骨折、長時間の圧迫など）。当たらず歩ければ <b>緑</b>、歩けなければ <b>黄</b>。</p>
+   <p class="lbl">処置できる人</p>
+   <p><b>隊員</b>：観察、酸素投与、気道確保、止血、副子固定、骨盤固定具、CPR</p>
+   <p><b>救命士</b>：上記＋血糖測定、指示要請。医師の指示を受けて 静脈路確保と輸液（心停止、またはショック・クラッシュ症候群が疑われる場合）、ブドウ糖投与（血糖50mg/dL未満）、アドレナリン投与（心停止）</p>
+   <p><b>医師</b>：すべて＋気管挿管、胸腔ドレナージ。医師が現場にいれば、救命士は直接指示で特定行為ができる</p>
+   <p class="lbl">搬送</p>
+   <p>赤は三次（救命救急センター・ドクターヘリ）へ。黄は二次。緑は緑用の医療機関へ。救急車1台に赤1名、または黄・緑2名。</p>
+   <p class="note">救命士は全員、処置範囲拡大2行為と薬剤投与の認定済みとしています。細部は各地域のMCプロトコルに従ってください。</p>`]
+};
+
+const DB={
+ d1:{title:'すぐに車内へ進入すべきか',bullets:['ev_dispatch','ev_weather','ev_fuel','ev_smoke','ev_wire','ev_glass','ev_cliff','ev_3s'],
+  st:[
+   {w:'sak',t:'バスは横転、車内に[複数名が取り残されて|a]います！'},
+   {w:'sak',t:'路面に液体が流れてますけど、[雨水でしょう|b]。問題ありません'},
+   {w:'sak',t:'[エンジンも止まってる|e]し、火が出る心配はないです'},
+   {w:'sak',t:'屋根側の窓から入れば早い。[車体によじ登って|c]進入します！'},
+   {w:'sak',t:'人命がかかってるんです。[安全確認より救出が優先|d]ですよね？'}],
+  wk:{a:{fb:'取り残されているのは事実です。そこは争点じゃありませんよ'},
+      b:{ans:['ev_fuel','ev_weather'],fb:'今日は雨が降っておらず、路面も乾いている。後部から広がる虹色の油膜と軽油臭は燃料漏れだ。',miss:'燃料漏れに誰も気づかないまま進入。後着の消防隊長が油膜に気づいて全員を下がらせ、救出が数分止まった。'},
+      e:{ans:['ev_smoke'],fb:'エンジン部から白煙が出ていて、エンジンはかかったまま。漏れた燃料の着火源になりうる。消防隊によるエンジン停止とバッテリー遮断、警戒筒先の配備が先だ。',miss:'エンジンがかかったまま活動を開始。白煙が増えて全員が一時退避した。'},
+      c:{ans:['ev_wire'],fb:'垂れ下がった電線が車体に触れている。車体に電気が流れているおそれがある。電力会社に送電停止を依頼し、確認がとれるまで車体に触れない。',miss:'佐倉が車体に手をかけた瞬間、消防隊長が制止した。垂れた電線が車体に触れていた。一歩間違えば感電事故だった。'},
+      d:{ans:['ev_3s'],fb:'MCLSの安全は3S。まずSelf（自分）、次にScene（現場）、最後にSurvivor（傷病者）。救助者が負傷すれば、傷病者が1人増えるだけで救える人数は減る。',miss:'隊員の安全意識が徹底されず、その後もヒヤリとする場面が続いた。'}}},
+ d2:{title:'指令センターへの第一報（METHANE）',bullets:['ev_methane','ev_fuel','ev_smoke','ev_wire','ev_witness','ev_trapped','ev_weather'],
+  st:[
+   {w:'oni',t:'M：[多数傷病者事故|a]を宣言します'},
+   {w:'oni',t:'E：県道、峠トンネル西側出口から約200m'},
+   {w:'oni',t:'T：マイクロバスの単独横転事故'},
+   {w:'oni',t:'H：危険要因は[特になし|b]'},
+   {w:'oni',t:'A：進入は西側からのみ可能'},
+   {w:'oni',t:'N：傷病者は[およそ5名|c]'},
+   {w:'oni',t:'E：救急隊3隊とドクターヘリを要請。[救助隊は不要|d]'}],
+  wk:{a:{fb:'傷病者多数、ここでの宣言は正しい。宣言が早いほど応援も早く動けます'},
+      b:{ans:['ev_fuel','ev_smoke','ev_wire'],fb:'燃料漏れや垂れ下がった電線を伝えなければ、後着隊が危険を知らずに進入する。H（Hazards）は後から来る隊の安全を守る情報だ。',miss:'後着隊は危険要因を知らずに到着し、現場で改めて安全確認をやり直すことになった。'},
+      c:{ans:['ev_witness'],fb:'運転手は「乗客8人と自分で9人」と証言している。見えている人数だけで報告すると、車内や周辺の未発見者を見落とす。確定していなくても「約9名」と最大値で伝える。',miss:'過小な人数で報告したため、応援隊の規模が足りず、追加要請で到着が遅れた。'},
+      d:{ans:['ev_trapped'],fb:'座席に脚を挟まれた乗客がいる。救出には救助隊の資機材が必要だ。挟まれた時間が長いほど、クラッシュ症候群の危険も高まる。',miss:'救助隊の要請が遅れ、挟まれた乗客の救出がさらに長引いた。'}}}
+};
+
+/* ---- Story ---- */
+const S=[
+ {t:'title'},
+ {t:'narr',x:'15時42分。山あいの県道で、マイクロバスが横転したとの119番通報が入った。'},
+ {t:'say',w:'cmd',x:'救急1、出場せよ。県道、峠トンネル西側出口付近、マイクロバス横転。乗客多数の模様。'},
+ {t:'say',w:'oni',x:'隊長、多数傷病者の可能性が高いですね。現着まで約8分です。'},
+ {t:'say',w:'sak',x:'了解！ 全員助けましょう！'},
+ {t:'get',ids:['ev_dispatch']},
+ {t:'narr',x:'あなたは最先着の救急隊長。現場の最初の指揮は、あなたが執る。'},
+ {t:'chap',i:0,s:'最先着隊長が、まず指揮を確立する',m:'判断'},
+ {t:'narr',x:'現着。バスは右側面を下にして横転している。車内から助けを求める声。周囲には歩いて出てきた数名の乗客。'},
+ {t:'choice',q:'現着直後、隊長として最初に行うことは？',o:[
+  {l:'全員で車内に進入し、救出を始める',ok:0,fb:'隊長自身が個別の救出に入ると、全体を見る人がいなくなります。MCIでは最初に「指揮」を確立します。'},
+  {l:'MCIを宣言し、指揮者として隊員の役割を指定する',ok:1,fb:'正解。最先着隊長が現場指揮を宣言し、安全確認・情報伝達・トリアージの役割を割り振る。CSCATTTは指揮から始まる。'},
+  {l:'近くの傷病者から順に観察を始める',ok:0,fb:'目の前の1人に集中すると全体像を見失います。まず指揮系統を確立しましょう。'}]},
+ {t:'say',w:'oni',x:'指揮宣言、了解。隊長の指示で動きます。'},
+ {t:'chap',i:1,s:'Self → Scene → Survivor',m:'現場調査 → 指揮ミーティング'},
+ {t:'get',ids:['ev_3s']},
+ {t:'narr',x:'車内に入る前に、現場の危険を確かめる。ただし時間は限られている。'},
+ {t:'explore',id:'bus'},
+ {t:'say',w:'sak',e:'a',x:'隊長、車内に入ります！ 話し合ってる時間なんてないですよ！'},
+ {t:'say',w:'you',x:'待て、佐倉。その判断、もう一度聞かせてくれ。'},
+ {t:'debate',id:'d1'},
+ {t:'say',w:'sakaki',x:'消防隊、現着。警戒筒先を配備、エンジン停止とバッテリー遮断を実施する。電力会社にも送電停止を依頼した。……よし、進入していいぞ。'},
+ {t:'say',w:'sak',e:'s',x:'す、すみません。焦ってました……。'},
+ {t:'say',w:'sak',e:'n',x:'もう大丈夫です。安全確認、徹底します！'},
+ {t:'chap',i:2,s:'聞き取りで情報を集め、第一報はMETHANEで',m:'聞き取り → 指揮ミーティング'},
+ {t:'narr',x:'額から血を流した運転手が、自分で歩いて近づいてきた。'},
+ {t:'interview',id:'drv'},
+ {t:'get',ids:['ev_methane']},
+ {t:'say',w:'oni',e:'a',x:'隊長、第一報の内容を読み上げます。確認をお願いします。'},
+ {t:'debate',id:'d2'},
+ {t:'say',w:'oni',e:'s',x:'……数字も危険も、見えたものだけで報告するところでした。訂正して送ります。'},
+ {t:'say',w:'cmd',x:'指令センター了解。危険要因と傷病者数、受信した。応援隊を追加で出場させる。'},
+ {t:'chap',i:3,s:'現場を評価し、指揮所・トリアージポスト・救護所の配置を決める',m:'配置マップ'},
+ {t:'say',w:'sakaki',x:'消防警戒区域を設定した。バスを中心に半径およそ50mだ。救急隊は区域の外で活動してくれ。'},
+ {t:'mapplace'},
+ {t:'say',w:'sakaki',x:'救助隊から報告。車内の捜索で、乗客がさらに見つかった。全部で12名だ。1名は脚を挟まれていて、救出に時間がかかる。'},
+ {t:'chap',i:4,s:'トリアージ・治療・搬送を、1つの救護所で回す',m:'救護所シミュレーション'},
+ {t:'say',w:'you',x:'救護所を立ち上げた。人も資器材も救急車も足りない。全員を救うために、誰に何を回すか決めるぞ。'},
+ {t:'sim'},
+ {t:'say',w:'oni',x:'16時40分。救護所の活動を後着の指揮隊に引き継ぎます。'},
+ {t:'say',w:'you',x:'全員の命を背負うのが指揮だ。……今日の判断、必ず振り返ろう。'},
+ {t:'result'}
+];
+
+/* ---- Shared state & UI helpers ---- */
+let G;
+function reset(){G={i:0,hearts:5,ev:new Set(),miss:0,chapter:-1,sim:null,over:[],sc:(G&&G.sc)||'bus',solo:false,inSim:false}}
+reset();
+const $=s=>document.querySelector(s), stage=$('#stage');
+function hud(){
+  $('#track').innerHTML=CS.map((c,k)=>`<span class="${k<G.chapter?'done':k===G.chapter?'now':''}">${c[0]}<small>${c[1]}</small></span>`).join('');
+  $('#hearts').innerHTML='信頼'+[0,1,2,3,4].map(k=>`<i class="${k<G.hearts?'':'off'}"></i>`).join('');
+  $('#evbtn').textContent='根拠カード '+G.ev.size;
+}
+function setChap(c){if(c>G.chapter){G.chapter=c;hud()}}
+function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;const gd=document.getElementById('guide');e.style.top=gd&&!gd.classList.contains('bot')?(gd.getBoundingClientRect().bottom+8)+'px':'';clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2000)}
+function stamp(t){sfx('stamp');setTimeout(()=>{const f=document.createElement('div');f.className='hitflash';document.body.appendChild(f);setTimeout(()=>f.remove(),450);const a=document.getElementById('app');a.classList.remove('shake');void a.offsetWidth;a.classList.add('shake')},220);const e=$('#stamp');e.innerHTML=`<span>${t}</span>`;e.hidden=false;setTimeout(()=>e.hidden=true,1100)}
+function sheet(h,body,btns){
+  const ov=document.createElement('div');ov.className='ov';
+  ov.innerHTML=`<div class="sheet" role="dialog" aria-modal="true"><h3>${h}</h3>${body}<div class="btns">${btns.map((b,k)=>`<button class="${k?'ghost':'primary'}" data-k="${k}" type="button">${b[0]}</button>`).join('')}</div></div>`;
+  document.body.appendChild(ov);ov.querySelector('.btns button').focus();
+  ov.querySelectorAll('.btns button').forEach(x=>x.onclick=()=>{ov.remove();const cb=btns[x.dataset.k][1];cb&&cb()});
+}
+function next(){G.i++;render()}
+let typing=null;
+function type(el,text){clearInterval(typing);let n=0;el.textContent='';el._full=text;
+  typing=setInterval(()=>{n++;el.textContent=text.slice(0,n);if(n>=text.length){clearInterval(typing);typing=null}},24)}
+function talk(who,text,e){
+  const c=who?CH[who]:null;
+  const por=!c||who==='you'?'':c.img?`<div class="portrait"><img class="pimg" style="--c:${c.c}" src="${c.img[e]||c.img.n}" alt="${c.n}"></div>`:`<div class="portrait"><div class="face" style="--c:${c.c}"><b>${c.k}</b></div></div>`;
+  stage.innerHTML=`<div class="talk ${c?'':'narr'}" id="tk">${por}
+   <div class="box" style="${c?'--c:'+c.c:''}">${c?`<span class="name">${c.n}<small>${c.r}</small></span>`:''}<p class="line" id="ln"></p><span class="nxt">▼ タップ</span></div></div>`;
+  const ln=$('#ln');type(ln,text);
+  if(who==='cmd')sfx('radio');
+  $('#tk').onclick=()=>{sfx('tap');if(typing){clearInterval(typing);typing=null;ln.textContent=ln._full}else next()};
+}
+function render(){
+  stopDebate();stopSort();document.querySelector('.hud').hidden=false;
+  const s=SC[G.sc].story[G.i];hud();stage.scrollTop=0;
+  if(s.t==='result')clearSave();else if(s.t!=='title')saveGame();
+  bgm(s.t==='title'?'title':s.t==='explore'||s.t==='interview'?'survey':s.t==='debate'?'meeting':s.t==='mapplace'?'map':s.t==='sim'?'aid':s.t==='result'?'result':G.chapter<0?'dispatch':BGM.want);
+  if(s.t==='title')return title();
+  if(s.t==='narr')return talk(null,s.x);
+  if(s.t==='say')return talk(s.w,s.x,s.e);
+  if(s.t==='explore')return explore(s.id);
+  if(s.t==='interview')return interview(s.id);
+  if(s.t==='mapplace')return mapPlace(s.id);
+  if(s.t==='chap'){sfx('chap');setChap(s.i);const c=CS[s.i];
+    stage.innerHTML=`<div class="chap" id="ck"><span class="no">CSCATTT ${s.i+1}/7</span><span class="big">${c[0]}</span><h2>${c[1]}<br><small style="font-size:.5em;color:var(--muted)">${c[2]}</small></h2><p>${s.s}</p><span class="mode">${s.m}</span><span class="nxt" style="position:static;align-self:flex-end">▼ タップ</span></div>`;
+    $('#ck').onclick=next;return}
+  if(s.t==='get'){sfx('get');s.ids.forEach(id=>G.ev.add(id));hud();
+    stage.innerHTML=`<div class="get" id="gt"><span class="hd">根拠カード入手</span>${s.ids.map(id=>`<div class="evcard"><b>${EV[id][0]}</b><span>${EV[id][1]}</span></div>`).join('')}<span class="nxt" style="position:static;align-self:flex-end">▼ タップ</span></div>`;
+    $('#gt').onclick=next;return}
+  if(s.t==='choice')return choice(s);
+  if(s.t==='debate')return debate(s.id);
+  if(s.t==='sim')return simReady(false,s.id||'bus');
+  if(s.t==='result')return result();
+}
+let titleSel='bus';
+function title(){
+  bgm('title');G.chapter=-1;hud();document.querySelector('.hud').hidden=true;
+  const IMG={bus:'img/scene_bus.webp',chem:'img/scene_chem.webp',hwy:'img/scene_hwy.webp',fire:'img/scene_fire.webp',train:'img/scene_train.webp'};
+  const c=SC[titleSel];
+  stage.innerHTML=`<div class="ttl">
+   <header class="ttl-h"><h1>現場コマンダー</h1><span>MCLS 多数傷病者対応トレーニング</span></header>
+   <div class="ttl-hero"><img src="${IMG[titleSel]}" alt="${c.n}の現場"><div class="ttl-cap"><span class="ttl-no">CASE ${String(Object.keys(SC).indexOf(titleSel)+1).padStart(2,'0')}</span><b>${c.n}</b><span>${c.when}</span></div></div>
+   <div class="ttl-tabs" role="tablist">${Object.entries(SC).map(([k,v])=>`<button type="button" role="tab" aria-selected="${k===titleSel}" class="ttl-tab ${k===titleSel?'on':''}" data-k="${k}"><img src="${IMG[k]}" alt=""><span>${v.n.replace(/の.*$/,'').replace('マイクロバス横転','バス横転')}</span></button>`).join('')}</div>
+   <div class="ttl-learn">${c.learn.map(l=>`<span>${l}</span>`).join('')}</div>
+   ${(()=>{const d=loadSave();if(!d)return'';const l=saveLabel(d);return`<button type="button" class="ttl-resume" id="rs"><span><b>続きから</b>${l.name}・${l.where}（${l.ago}）</span><i>再開 ▶</i></button>`})()}
+   <div class="ttl-act"><button class="primary" id="go" type="button">出場する</button><button class="ghost" id="so" type="button">救護所だけ</button></div>
+   <div class="ttl-foot"><button type="button" id="sndt" class="lnk ${BGM.on?'on':''}">${BGM.on?'♪ オン':'♪ オフ'}</button><button type="button" id="how" class="lnk">遊び方</button><button type="button" id="dj" class="lnk">トリアージ道場</button></div></div>`;
+  stage.querySelectorAll('.ttl-tab').forEach(b=>b.onclick=()=>{titleSel=b.dataset.k;title()});
+  $('#go').onclick=()=>{G.sc=titleSel;reset();G.i=1;render()};
+  $('#so').onclick=()=>{G.sc=titleSel;reset();G.chapter=4;document.querySelector('.hud').hidden=false;hud();simReady(true,G.sc)};
+  const rs=$('#rs');if(rs)rs.onclick=resumeGame;
+  $('#dj').onclick=dojo;$('#sndt').onclick=()=>setSound(!BGM.on);
+  $('#how').onclick=()=>sheet('遊び方',`<ul class="msgs"><li><b>C・S・C・A</b><br>写真で現場を調べて根拠カードを集め、指揮ミーティングで隊員の判断を是正する。最後に拠点を地図に配置する。</li><li><b>T・T・T</b><br>ターン制の救護所シミュレーション。限られた人員・資器材・救急車で傷病者を救う。</li><li><b>トリアージ道場</b><br>START法の60秒仕分け。</li></ul><p class="note">教育用の架空シナリオです。実際の活動は各地域のプロトコル・MCLS標準に従ってください。</p>`,[['閉じる']]);
+}
+function choice(s){
+  stage.innerHTML=`<div class="choice"><div class="q">${s.q}</div>${s.o.map((o,k)=>`<button class="opt" data-k="${k}" type="button">${o.l}</button>`).join('')}<div id="fb"></div></div>`;
+  stage.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+    const o=s.o[b.dataset.k];
+    if(o.ok){sfx('good');b.classList.add('good');stage.querySelectorAll('.opt').forEach(x=>x.disabled=true);
+      $('#fb').innerHTML=`<div class="fb good">${o.fb}</div><div class="btns" style="margin-top:10px"><button class="primary" id="cn" type="button">次へ</button></div>`;$('#cn').onclick=next}
+    else{sfx('wrong');G.miss++;b.classList.add('bad');b.disabled=true;$('#fb').innerHTML=`<div class="fb bad">${o.fb}</div>`}
+  });
+}
+
+/* ---- Debate ---- */
+let D=null;
+function stopDebate(){if(D){clearTimeout(D.tm);D=null}}
+const fmt=(t,solved)=>t.replace(/\[([^|\]]+)\|(\w+)\]/g,(m,s,id)=>`<button type="button" class="weak ${solved.has(id)?'done':''}" data-w="${id}">${s}</button>`);
+const keys=d=>Object.keys(d.wk).filter(k=>d.wk[k].ans);
+function debate(id){
+  const d=DB[id];D={id,d,idx:0,solved:new Set(),bul:null,paused:false,tm:null,hold:false};
+  stage.innerHTML=`<div class="debate"><div class="dhead"><span class="dlabel">指揮ミーティング</span><span class="dtitle">${d.title}</span><span class="dleft" id="left"></span></div>
+   <div class="arena" id="arena"></div>
+   <div class="ctrl"><button type="button" id="pv" aria-label="前の発言">◀</button><div class="dots" id="dots"></div><button type="button" id="ps" aria-label="一時停止">❚❚</button><button type="button" id="nx" aria-label="次の発言">▶</button></div>
+   <div class="guide">根拠カードを選んでから、オレンジの言葉をタップして示す</div>
+   <div class="bullets">${d.bullets.filter(b=>G.ev.has(b)).map(b=>`<button type="button" class="bul" data-b="${b}">${EV[b][0]}</button>`).join('')}</div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="ghost sm" id="evv" type="button">選んだカードの中身を見る</button><button class="ghost sm" id="nog" type="button">根拠が足りない（このまま進める）</button></div></div>`;
+  $('#pv').onclick=()=>show(D.idx-1);$('#nx').onclick=()=>show(D.idx+1);
+  $('#ps').onclick=()=>{D.paused=!D.paused;$('#ps').textContent=D.paused?'▶︎':'❚❚';show(D.idx)};
+  stage.querySelectorAll('.bul').forEach(b=>b.onclick=()=>{D.bul=b.dataset.b;stage.querySelectorAll('.bul').forEach(x=>x.classList.toggle('sel',x===b))});
+  $('#nog').onclick=()=>{D.hold=true;clearTimeout(D.tm);
+    sheet('根拠がないまま進めますか？','<p>残っている誤りは是正されないまま活動が始まります。現場で集められなかった根拠は、あとから取り戻せません。</p>',[['このまま進める',giveUp],['ミーティングに戻る',()=>{D.hold=false;show(D.idx)}]])};
+  $('#evv').onclick=()=>{if(!D.bul)return toast('先に根拠カードを選んでください');sheet(EV[D.bul][0],`<p>${EV[D.bul][1]}</p>`,[['閉じる']])};
+  show(0);
+}
+function show(i){
+  if(!D)return;const d=D.d,n=d.st.length;D.idx=(i+n)%n;clearTimeout(D.tm);
+  const s=d.st[D.idx],c=CH[s.w],dur=4800,a=$('#arena');
+  a.classList.toggle('paused',D.paused||D.hold);
+  a.innerHTML=`<div class="spk">${c.img?`<img style="--c:${c.c}" src="${c.img.a||c.img.n}" alt="">`:`<i style="--c:${c.c}">${c.k}</i>`}${c.n}｜${c.r}</div><p class="stmt">${fmt(s.t,D.solved)}</p><div class="bar" style="animation-duration:${dur}ms"></div>`;
+  $('#dots').innerHTML=d.st.map((_,k)=>`<i class="${k===D.idx?'on':''}"></i>`).join('');
+  $('#left').textContent=`残りの誤り ${keys(d).length-D.solved.size}`;
+  a.querySelectorAll('.weak').forEach(w=>w.onclick=e=>{e.stopPropagation();shoot(w.dataset.w)});
+  if(!D.paused&&!D.hold)D.tm=setTimeout(()=>show(D.idx+1),dur);
+}
+function giveUp(){
+  const left=keys(D.d).filter(k=>!D.solved.has(k));
+  left.forEach(k=>{G.miss+=2;G.over.push(D.d.wk[k].miss)});
+  sheet('その結果……',`<ul class="msgs">${left.map(k=>`<li class="bad">${D.d.wk[k].miss}</li>`).join('')}</ul>`,[['次へ',next]]);
+}
+function shoot(w){
+  if(D.solved.has(w))return;
+  if(!D.bul)return toast('先に下の根拠カードを選んでください');
+  const wk=D.d.wk[w];
+  if(wk.ans&&wk.ans.includes(D.bul)){
+    D.solved.add(w);D.hold=true;clearTimeout(D.tm);stamp('是正！');
+    const done=D.solved.size===keys(D.d).length;
+    const bul=D.bul,dd=D;setTimeout(()=>{if(D!==dd)return;sheet('是正：'+EV[bul][0],`${(CH[D.d.st[D.idx].w].img||{}).s?'<img class="pimg sm" src="'+CH[D.d.st[D.idx].w].img.s+'" alt="">':''}<p>${wk.fb}</p>`,[[done?'ミーティングを終える':'ミーティングに戻る',()=>{if(done)next();else{D.hold=false;show(D.idx)}}]])},900);
+  }else{
+    sfx('wrong');G.hearts--;G.miss++;hud();const a=$('#arena');a.classList.remove('shake');void a.offsetWidth;a.classList.add('shake');
+    const c=CH[D.d.st[D.idx].w];
+    a.insertAdjacentHTML('beforeend',`<div class="retort" style="border-color:${c.c}">${c.n}「${wk.ans?'その根拠では、判断は変えられませんよ':wk.fb}」</div>`);
+    if(G.hearts<=0){D.hold=true;clearTimeout(D.tm);
+      setTimeout(()=>sheet('信頼を失った……','<p>隊員たちがあなたの指示に迷い始めた。根拠カードの中身を確かめて、もう一度ミーティングに臨もう。</p>',[['ミーティングをやり直す',()=>{G.hearts=5;hud();debate(D.id)}]]),700)}
+  }
+}
+$('#evbtn').onclick=()=>{
+  const list=[...G.ev].map(id=>`<div class="evcard"><b>${EV[id][0]}</b><span>${EV[id][1]}</span></div>`).join('')||'<p class="note">まだ根拠カードはありません。</p>';
+  sheet('根拠カード一覧',`<div class="evlist">${list}</div>`,[['閉じる']]);
+};
+
+/* ===================== 現場調査・聞き取り ===================== */
+function cardTray(fresh){
+  const ids=[...G.ev];
+  return `<div class="tray"><div class="tray-h"><span>入手した根拠カード</span><b>${ids.length}枚</b></div>
+   <div class="tray-l">${ids.length?ids.map(id=>`<button type="button" class="tcard ${fresh===id?'new':''}" data-ev="${id}"><i>根拠</i>${EV[id][0]}</button>`).join(''):'<span class="note">まだない。調べたり聞いたりして集めよう。</span>'}</div></div>`;
+}
+function bindTray(){stage.querySelectorAll('.tcard').forEach(b=>b.onclick=()=>{sfx('tap');sheet(EV[b.dataset.ev][0],`<p>${EV[b.dataset.ev][1]}</p>`,[['閉じる']])})}
+const EXP={bus:{img:'img/scene_bus.webp',title:'現着時の状況評価',checks:5,
+  intro:'気になる場所をタップして調べる。危険を見落とさないよう、気になる所はすべて確かめよう。',
+  spots:[
+   {id:'oil',b:[66,64,33,34],n:'バス後部の路面',x:'虹色の油膜が広がり、強い軽油の臭いがする。燃料が漏れている。',ev:'ev_fuel',hz:1},
+   {id:'smoke',b:[65,18,10,44],n:'エンジン部',x:'エンジン部から白煙。エンジン音がまだ聞こえる。かかったままだ。',ev:'ev_smoke',hz:1},
+   {id:'wire',b:[75,4,19,30],n:'電柱と電線',x:'電柱が傾き、垂れ下がった電線がバスの車体に触れている。',ev:'ev_wire',hz:1},
+   {id:'wire2',b:[24,38,14,15],n:'ガードレール側の電線',x:'バスから伸びた電線がガードレール方向へ垂れている。電柱から切れた線のようだ。',ev:'ev_wire',hz:1,alias:'wire'},
+   {id:'glass',b:[33,50,17,12],n:'車体の周り',x:'割れた窓ガラスが広く散乱している。手袋だけでなく、保護メガネとヘルメットが必要だ。',ev:'ev_glass',hz:1},
+   {id:'cliff',b:[0,44,22,14],n:'ガードレールの外',x:'ガードレールの外は谷へ落ちる急斜面。傷病者を運ぶときに足を踏み外すと危ない。',ev:'ev_cliff',hz:1},
+   {id:'sky',b:[0,0,58,22],n:'空と路面',x:'空は曇り。朝から雨は降っておらず、路面は乾いている。',ev:'ev_weather'},
+   {id:'front',b:[36,37,5,14],n:'バスの前方',x:'フロントガラスが割れている。車内から助けを求める声が聞こえる。救出は消防隊と連携して行う。'},
+   {id:'bag',b:[0,66,30,33],n:'散乱した荷物',x:'乗客のスーツケースやバッグ。今、確かめる必要はなさそうだ。'}
+  ]}};
+function explore(id){
+  const e=EXP[id];const found=new Set();let fresh=null;
+  const draw=()=>{
+    stage.innerHTML=`<div class="explore"><div class="dhead"><span class="dlabel">現場調査</span><span class="dtitle">${e.title}</span><span class="dleft">調べた ${found.size} か所</span></div>
+     <p class="guide" style="margin:0">${e.intro}${matchMedia('(max-width:700px)').matches?'　画像は横にスクロールできる。':''}</p>
+     ${e.img?`<div class="scene-wrap"><div class="scene" id="sc"><img src="${e.img}" alt="${e.alt||'現場写真'}" draggable="false">
+      ${e.spots.map(p=>`<button type="button" class="hs ${found.has(p.id)?'done':''}" data-s="${p.id}" aria-label="${found.has(p.id)?p.n:'調べる場所'}" style="left:${p.b[0]}%;top:${p.b[1]}%;width:${p.b[2]}%;height:${p.b[3]}%"></button>`).join('')}</div></div>`
+     :`<div class="mapwrap"><div class="scene" id="sc" style="cursor:default">${svgOpen}${MAPDEFS}${MAPS[e.map].art()}
+      ${e.spots.map(p=>{const f=found.has(p.id);return`<g class="hs" data-s="${p.id}" tabindex="0" role="button" aria-label="${f?p.n:'調べる場所'}" style="cursor:pointer"><circle cx="${p.x}" cy="${p.y}" r="17" fill="${f?'#36d39a':'#ffae1f'}" stroke="#1b1b22" stroke-width="2"/><text x="${p.x}" y="${p.y+5}" text-anchor="middle" font-size="15" font-weight="700" fill="#1b1b22">${f?'✓':'?'}</text>${f?`<text x="${p.x}" y="${p.y+31}" text-anchor="middle" font-size="10" stroke="#f4f1e6" stroke-width="3" paint-order="stroke">${p.n}</text>`:''}</g>`}).join('')}</svg></div></div>`}
+     ${cardTray(fresh)}
+     <button class="primary" id="fin" type="button">調査を終えてミーティングへ</button></div>`;
+    bindTray();fresh=null;
+    $('#sc').onclick=ev=>{if(ev.target.closest('.hs'))return;sfx('miss');toast('ここには特に気になるものはない')};
+    stage.querySelectorAll('.hs').forEach(b=>b.onclick=ev=>{
+      const p=e.spots.find(x=>x.id===b.dataset.s);
+      if(!ev.clientX&&!ev.clientY)ev={clientX:$('#sc').getBoundingClientRect().left+20,clientY:$('#sc').getBoundingClientRect().top+20};const r=$('#sc').getBoundingClientRect();const pg=document.createElement('span');pg.className='ping';pg.style.left=(ev.clientX-r.left)+'px';pg.style.top=(ev.clientY-r.top)+'px';$('#sc').appendChild(pg);
+      const txt=p.t||p.x;if(found.has(p.id)){sheet(p.n,`<p>${txt}</p>`,[['閉じる']]);return}
+      found.add(p.id);const isNew=p.ev&&!G.ev.has(p.ev);if(isNew)fresh=p.ev;sfx(isNew?'get':'look');if(p.ev)G.ev.add(p.ev);hud();
+      setTimeout(()=>sheet(p.n,`<p>${txt}</p>${isNew?`<div class="evcard"><b>根拠カード入手：${EV[p.ev][0]}</b><span>${EV[p.ev][1]}</span></div>`:''}`,[['続ける',draw]]),250);
+    });
+    stage.querySelectorAll('g.hs').forEach(g=>g.onkeydown=k=>{if(k.key==='Enter'||k.key===' '){k.preventDefault();g.onclick({clientX:0,clientY:0})}});
+    $('#fin').onclick=()=>{
+      const go=()=>{const miss=e.spots.filter(p=>p.hz&&!p.alias&&!found.has(p.id)&&!e.spots.some(q=>q.alias===p.id&&found.has(q.id))).map(p=>p.n);
+        if(miss.length)G.over.push(`現場調査で確認しなかった場所：${miss.join('、')}`);next()};
+      sheet('調査を終えますか？','<p>ミーティングでは、ここで集めた根拠カードしか使えない。見落としはないか確認しよう。</p>',[['調査を終える',go],['調査を続ける']]);
+    };
+  };
+  draw();
+}
+const IVW={drv:{who:'drv',max:4,intro:'運転手は額から血を流し、動揺している。',
+  qs:[
+   {q:'乗っていたのは何人ですか？',a:'乗客は8人です……私を入れて9人。',ev:'ev_witness'},
+   {q:'何があったんですか？',a:'カーブでブレーキの効きが悪くなって……ハンドルを切ったら横転しました。'},
+   {q:'車内に残っている人はいますか？',a:'一番後ろの男性が、座席に脚を挟まれて動けないと叫んでいました。',ev:'ev_trapped'},
+   {q:'エンジンは止めましたか？',a:'いえ……それどころじゃなくて。かかったままだと思います。',ev:'ev_smoke'},
+   {q:'持病のある乗客はいましたか？',a:'年配の女性が、インスリンを打っていると話していました。お昼はまだだったはずです。',ev:'ev_insulin'},
+   {q:'あなたのけがは？',a:'額を切っただけです。歩けます。'}
+  ]}};
+function interview(id){
+  const v=IVW[id],c=CH[v.who];const asked=[];let fresh=null;
+  const draw=()=>{
+    const max=v.max||4,left=Math.min(max,v.qs.length)-asked.length;
+    stage.innerHTML=`<div class="iv"><div class="dhead"><span class="dlabel">聞き取り</span><span class="dtitle">${c.n}（${c.r}）</span><span class="dleft">あと ${left} 問</span></div>
+     <div class="portrait">${c.img?`<img class="pimg" style="--c:${c.c}" src="${c.img.n}" alt="${c.n}">`:`<div class="face" style="--c:${c.c}"><b>${c.k}</b></div>`}</div>
+     <p class="guide" style="margin:0">${v.intro}聞けるのは${max}つまで。何を聞くかが判断の分かれ目。</p>
+     <div class="qa">${asked.map(k=>`<div><b>あなた：${v.qs[k].q}</b>${c.n}「${v.qs[k].a}」</div>`).join('')}</div>
+     ${left?`<div class="qs">${v.qs.map((q,k)=>asked.includes(k)?'':`<button class="opt" type="button" data-q="${k}">${q.q}</button>`).join('')}</div>`:''}
+     ${cardTray(fresh)}
+     <button class="primary" id="fin" type="button">聞き取りを終える</button></div>`;
+    bindTray();fresh=null;
+    stage.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{const k=+b.dataset.q;asked.push(k);const q=v.qs[k];
+      sfx('tap');if(q.ev&&!G.ev.has(q.ev)){sfx('get');G.ev.add(q.ev);fresh=q.ev;hud();toast('根拠カード入手：'+EV[q.ev][0])}draw();const qa=stage.querySelector('.qa div:last-child');qa&&qa.scrollIntoView&&qa.scrollIntoView({block:'center'})});
+    const f=$('#fin');if(f)f.onclick=next;
+  };
+  draw();
+}
+
+/* ===================== 配置マップ ===================== */
+const SLOTS={
+ A:{x:392,y:252,n:'バスのすぐ横',d:'危険区域の中。燃料漏れと垂れた電線のすぐそば。',bad:'危険区域の中。燃料漏れと垂れた電線のすぐそばで、活動する人も傷病者も危険にさらす。'},
+ B:{x:535,y:150,n:'東のカーブの先',d:'バスの東側。風下になる。',bad:'風下になり、漏れた燃料の気化ガスや煙が流れてくる。救急車は西からしか入れないので、動線も逆になる。'},
+ C:{x:30,y:150,n:'トンネルの中',d:'屋根はあるが、排気がこもり無線が届きにくい。',bad:'トンネル内は排気ガスがこもり、無線も届きにくい。車両の出入りの妨げにもなる。'},
+ D:{x:300,y:236,n:'区域のすぐ外の路肩',d:'危険区域のすぐ外。救出された人が最初に通る場所。'},
+ E:{x:296,y:118,n:'北側の一段高い平場',d:'道路から一段高い。現場全体が見渡せる。'},
+ F:{x:176,y:236,n:'広い待避所',d:'道路沿いの広い待避所。救急車を横付けできる。'},
+ G:{x:82,y:222,n:'トンネル出口の駐車帯',d:'車両が止めやすく、出入りしやすい。'},
+ H:{x:196,y:352,n:'河川敷グラウンド',d:'平らで広く、周りに電線がない。救護所からは少し離れる。'}
+};
+const FACS={
+ cmd:{n:'現場指揮本部',k:'指',c:'#3c3a96',best:'E',ok:{D:'現場に近く把握しやすいが、トリアージポストと同じ場所では指揮者が個々の傷病者に巻き込まれやすい。',F:'安全だが、ここからはバスの周りが見えにくい。'},
+   why:'一段高い平場からは、バス・警戒区域・トリアージポスト・救護所がすべて見渡せる。危険区域の外で、全体を把握できる場所に置く。'},
+ tri:{n:'トリアージポスト',k:'T',c:'#e3343a',best:'D',ok:{F:'安全だが、救出された人をここまで運ぶ距離が長くなる。'},
+   why:'救出された人は全員ここを通る。危険区域のすぐ外、救出ルートの出口に置くと、運ぶ距離が最短になる。'},
+ aid:{n:'救護所',k:'救',c:'#2fae63',best:'F',ok:{G:'使えるが、トリアージポストから遠くなる。'},bad:{D:'危険区域に近すぎる。救護所はトリアージポストより一歩下がった、広く安全な場所に置く。',H:'救急車の動線から外れ、搬送のたびに坂道を行き来することになる。'},
+   why:'トリアージポストのすぐ後ろで広さがあり、救急車を横付けできる。現場→トリアージ→救護所→搬送の流れが西へ一方向にそろう。'},
+ stg:{n:'救急車の待機場所',k:'車',c:'#c27a1a',best:'G',ok:{F:'救護所と重なると、車両と担架がぶつかり合う。'},
+   why:'救護所の先で車両が止めやすく、出入りもしやすい。到着した救急車がここで待ち、呼ばれた順に救護所へ横付けする。'},
+ heli:{n:'臨時ヘリ離着陸場',k:'H',c:'#6b4fa0',best:'H',ok:{},bad:{G:'道路沿いには電線や樹木があり、ローターの吹き下ろしで車両や救護所にも影響が出る。',F:'救護所のそばでは、ローターの吹き下ろしで砂ぼこりや資器材が舞う。'},
+   why:'平らで広く、電線がない。救護所から少し離れているので、吹き下ろしの影響も受けにくい。'}
+};
+const T=(x,y,t,o='')=>`<text x="${x}" y="${y}" ${o}>${t}</text>`;
+function busArt(){return`  <rect width="600" height="400" fill="#f4f1e6"/>
+  <path d="M0,0 H600 V92 C520,70 470,96 420,104 C360,112 330,96 270,100 C200,104 120,124 0,128 Z" fill="#ddd3b7"/>
+  <path d="M0,0 H600 V92 C520,70 470,96 420,104 C360,112 330,96 270,100 C200,104 120,124 0,128 Z" fill="url(#hatch)" opacity=".5"/>
+  <path d="M255,102 C270,96 330,92 345,100 L340,134 C320,138 270,136 252,132 Z" fill="#e9e2cc" stroke="#b9ae8f"/>
+  ${T(470,40,'山側（岩壁）','font-size="12" fill="#6a6656"')}
+  <path d="M0,262 C120,258 220,272 320,268 C430,262 520,250 600,238 V400 H0 Z" fill="#d6e2cc"/>
+  <path d="M0,372 C150,360 300,380 450,366 C520,360 570,364 600,360" stroke="#8fbad0" stroke-width="14" fill="none" stroke-linecap="round"/>
+  ${T(470,330,'谷（急斜面）','font-size="12" fill="#5d6d55"')}${T(470,392,'川','fill="#4a7d96"')}
+  <rect x="140" y="330" width="112" height="40" rx="4" fill="#c3d8a8" stroke="#8aa36d"/>
+  <path d="M172,246 C168,280 176,310 186,330" stroke="#a8a291" stroke-width="10" fill="none"/>
+  <path d="M0,160 C120,168 210,226 310,224 C400,222 460,214 520,176 C556,152 580,128 600,118" stroke="#8d8778" stroke-width="34" fill="none"/>
+  <path d="M0,160 C120,168 210,226 310,224 C400,222 460,214 520,176 C556,152 580,128 600,118" stroke="#f4f1e6" stroke-width="2" stroke-dasharray="10 9" fill="none"/>
+  <path d="M60,190 C150,212 220,250 320,246 C410,242 470,236 530,200" stroke="#7a7466" stroke-width="2" stroke-dasharray="2 4" fill="none"/>
+  ${T(400,270,'ガードレール','fill="#6a6656" font-size="10"')}
+  <path d="M140,236 h72 v20 h-72 z" fill="#a39d8c" opacity=".55"/>
+  <path d="M40,192 h60 v20 h-60 z" fill="#a39d8c" opacity=".55"/>
+  <rect x="0" y="128" width="40" height="56" fill="#3b3a33"/><path d="M4,184 V150 a16,16 0 0 1 32,0 V184" fill="#1b1b22"/>
+  ${T(2,122,'トンネル','font-size="10"')}
+  <circle cx="400" cy="214" r="64" fill="#e3343a" fill-opacity=".09" stroke="#e3343a" stroke-width="2" stroke-dasharray="6 4"/>
+  ${T(338,140,'消防警戒区域（約50m）','fill="#b8282d" font-weight="700"')}
+  <ellipse cx="438" cy="236" rx="22" ry="8" fill="#9d8fc4" opacity=".55"/>
+  <g transform="rotate(-8 400 214)"><rect x="366" y="203" width="70" height="22" rx="3" fill="#fff" stroke="#3b3a33" stroke-width="2"/><rect x="368" y="206" width="8" height="16" fill="#9fb4c8"/></g>
+  ${T(372,196,'横転バス','font-weight="700"')}
+  <circle cx="452" cy="150" r="5" fill="#3b3a33"/><path d="M452,150 C440,170 430,190 424,206" stroke="#3b3a33" stroke-width="2" fill="none"/>${T(458,148,'垂れた電線','font-size="10"')}
+  <g transform="translate(36,30)"><path d="M0,0 h44" stroke="#3b3a33" stroke-width="3" marker-end="url(#ar)"/>${T(0,-6,'風向き（西→東）','font-size="10"')}</g>
+  <g transform="translate(570,40)"><path d="M0,14 L0,-10" stroke="#3b3a33" stroke-width="2" marker-end="url(#ar)"/>${T(-4,28,'N','font-weight="700"')}</g>
+  <g transform="translate(470,388)"><path d="M0,0 h60" stroke="#3b3a33" stroke-width="3"/>${T(20,-5,'50m','font-size="10"')}</g>
+`}
+const MAPS={bus:{slots:SLOTS,facs:FACS,art:busArt,flow:'M352,214 L312,230 M290,238 L196,238 M158,236 L104,226',flowNote:'現場 → トリアージポスト → 救護所 → 救急車 の流れ（西へ一方向）'}};
+function judgePlace(M,f,sl){const F=M.facs[f];if(sl===F.best)return{r:0,t:F.why};if(F.ok&&F.ok[sl])return{r:1,t:F.ok[sl]};
+  return{r:2,t:(F.bad&&F.bad[sl])||M.slots[sl].bad||`${M.slots[sl].n}は${F.n}に向かない。${F.why}`}}
+const MAPDEFS=`<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><line x1="0" y1="0" x2="0" y2="8" stroke="#b9ae8f" stroke-width="2"/></pattern>
+   <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1b1b22"/></marker></defs>`;
+const svgOpen=`<svg viewBox="0 0 600 400" role="img" aria-label="現場周辺の簡易地図" font-family="BIZ UDPGothic, Hiragino Sans, sans-serif" font-size="11" fill="#3b3a33">`;
+function mapSVG(M,place,answer){
+  const occ={};Object.entries(place).forEach(([f,sl])=>occ[sl]=f);
+  const ans=answer?Object.keys(M.facs).map(f=>{const sl=M.slots[M.facs[f].best];return`<circle cx="${sl.x}" cy="${sl.y}" r="20" fill="none" stroke="${M.facs[f].c}" stroke-width="4" stroke-dasharray="4 3"/>`}).join('')+
+    `<path d="${M.flow}" stroke="#1b1b22" stroke-width="3" fill="none" marker-end="url(#ar)"/>`:'';
+  return`${svgOpen}${MAPDEFS}${M.art()}${ans}
+  ${Object.entries(M.slots).map(([k,sl])=>{const f=occ[k],F=f&&M.facs[f];
+    return`<g class="slot" data-slot="${k}" tabindex="0" role="button" aria-label="${sl.n}${F?'：'+F.n:''}">
+     <circle class="ring" cx="${sl.x}" cy="${sl.y}" r="20" fill="${F?F.c:'#ffffff'}" fill-opacity="${F?1:.8}" stroke="${F?'#fff':'#3b3a33'}" stroke-width="2" ${F?'':'stroke-dasharray="4 3"'}/>
+     <text x="${sl.x}" y="${sl.y+5}" text-anchor="middle" font-size="${F?15:14}" font-weight="700" fill="${F?'#fff':'#3b3a33'}">${F?F.k:k}</text>
+     <text x="${sl.x}" y="${sl.y>345?sl.y-27:sl.y+34}" text-anchor="middle" font-size="10" fill="#3b3a33" stroke="#f4f1e6" stroke-width="3" paint-order="stroke">${sl.n}</text></g>`}).join('')}
+  </svg>`;
+}
+function mapPlace(id){
+  const M=MAPS[id||'bus'],SLOTS=M.slots,FACS=M.facs;
+  const place={};let sel=Object.keys(FACS)[0];
+  const draw=()=>{
+    const done=Object.keys(FACS).every(f=>place[f]);
+    stage.innerHTML=`<div class="explore"><div class="dhead"><span class="dlabel">配置マップ</span><span class="dtitle">活動拠点の配置</span></div>
+     <p class="guide" style="margin:0">下の施設を選び、地図の丸（A〜H）をタップして置く。置いた施設をもう一度選べば動かせる。1か所に置けるのは1つまで。</p>
+     <div class="mapwrap">${mapSVG(M,place,false)}</div>
+     <div class="mapinfo" id="mi">${sel?`<b>${FACS[sel].n}</b>を置く場所を選ぶ`:'場所をタップすると、その場所の様子がわかる'}</div>
+     <div class="facs">${Object.entries(FACS).map(([f,F])=>`<button type="button" class="fac ${sel===f?'sel':''} ${place[f]?'placed':''}" data-f="${f}" style="--fc:${F.c}"><i>${F.k}</i>${F.n}${place[f]?`：${place[f]}`:''}</button>`).join('')}</div>
+     <button class="primary" id="fin" type="button" ${done?'':'disabled'}>この配置で決定</button></div>`;
+    stage.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{sel=b.dataset.f;draw()});
+    stage.querySelectorAll('.slot').forEach(g=>{const act=()=>{const k=g.dataset.slot;
+      if(!sel){$('#mi').innerHTML=`<b>${SLOTS[k].n}</b>：${SLOTS[k].d}`;return}
+      const other=Object.keys(place).find(f=>place[f]===k&&f!==sel);if(other)delete place[other];
+      sfx('place');place[sel]=k;sel=Object.keys(FACS).find(f=>!place[f])||null;draw();
+      $('#mi').innerHTML=`<b>${SLOTS[k].n}</b>：${SLOTS[k].d}`};
+      g.onclick=act;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();act()}}});
+    $('#fin').onclick=()=>{if(!done)return;
+      const res=Object.keys(FACS).map(f=>({f,sl:place[f],...judgePlace(M,f,place[f])}));sfx(res.some(r=>r.r===2)?'wrong':'good');
+      res.forEach(r=>{G.miss+=r.r;if(r.r===2)G.over.push(`${FACS[r.f].n}を「${SLOTS[r.sl].n}」に設置：${r.t}`)});
+      const lab=['◎ 最適','△ 使えるが課題あり','× 不適'],col=['var(--ok)','var(--weak)','var(--siren)'];
+      stage.innerHTML=`<div class="explore"><div class="dhead"><span class="dlabel">配置マップ</span><span class="dtitle">配置の評価</span></div>
+       <div class="mapwrap">${mapSVG(M,place,true)}</div>
+       <p class="note" style="margin:0">点線の色付きの丸が模範の配置。矢印は ${M.flowNote}。</p>
+       <ul class="msgs">${res.map(r=>`<li style="border-left:4px solid ${col[r.r]}"><b style="color:${col[r.r]}">${lab[r.r]}</b>　${FACS[r.f].n}：${SLOTS[r.sl].n}<br><span style="font-size:13px">${r.t}${r.r?`<br>模範：${SLOTS[FACS[r.f].best].n}`:''}</span></li>`).join('')}</ul>
+       <button class="primary" id="nx" type="button">次へ</button></div>`;
+      stage.scrollTop=0;$('#nx').onclick=next;
+    };
+  };
+  draw();
+}
+
+/* ===================== 救護所シミュレーション ===================== */
+const MAXT=20, ROLE={emt:0,para:1,doc:2}, RN=['隊員','救命士','医師'];
+const fmtT=t=>{const b=(SIM&&SIM.cfg&&SIM.cfg.start)||[16,0];const m=b[0]*60+b[1]+2*t;return `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`};
+const lerp=(a,b,h)=>a+(b-a)*h;
+const VOK={jcs:0,rr:18,hr:84,sbp:130,spo2:98}, VBAD={jcs:300,rr:40,hr:155,sbp:45,spo2:72};
+const BUS_HOSP=[
+  {id:'ken',n:'県立救命救急センター',lv:3,cap:3,t:13,m:'三次・25分'},
+  {id:'dai',n:'大学病院救命センター',lv:3,cap:3,t:18,m:'三次・35分'},
+  {id:'shi',n:'市民総合病院',lv:2,cap:4,t:8,m:'二次・15分'},
+  {id:'cli',n:'外科クリニック群',lv:1,cap:5,t:6,m:'緑の受入・12分'}
+];
+const BUS_SCHED=[
+  {t:3,veh:'救急3',crew:[['小川',1],['石田',0],['上野',0]]},
+  {t:5,doc:'真壁'},
+  {t:6,veh:'救急4',crew:[['村上',1],['江口',0],['岡',0]]},
+  {t:8,heli:1},
+  {t:9,veh:'救急5',crew:[['中川',1],['堀',0],['吉田',0]]},
+  {t:10,bus:1},
+  {t:12,veh:'救急6',crew:[['今井',1],['関',0],['原',0]]},
+  {t:15,veh:'救急7',crew:[['野口',1],['菅',0],['丸山',0]]}
+];
+function mkP(o){return Object.assign({loc:'none',needs:{},base:0,walk:false,anat:[],find:[],tag:null,snap:null,snapT:null,seen:false,cpa:false,o2:false,order:false,bglKnown:false,bgl:104,log:[],underT:0,out:null},o,
+  {good:{...VOK,...(o.good||{})},bad:{...VBAD,...(o.bad||{})},needs:{...(o.needs||{})},sat:new Set()})}
+function busPatients(){return [
+  mkP({id:'A',ag:'男 52（運転手）',arr:0,hp:100,walk:true,look:'額を押さえ、自分で歩いてきた',find:['額の裂創（出血は少量）'],good:{rr:16,sbp:138},
+    tip:'歩ける軽症。救急車や三次の枠を使わず、緑用の搬送手段で運ぶ。'}),
+  mkP({id:'B',ag:'女 24',arr:0,hp:95,walk:true,needs:{bleed:3},look:'左腕をタオルで押さえて歩いてきた',find:['左前腕の切創から持続的な出血'],good:{rr:18,hr:80,sbp:122,spo2:99},
+    tip:'緑でも止血は先にやる。16:14に圧迫が外れて再出血する。訴えを拾って止血し直さないと、歩けなくなりショックに進む。'}),
+  mkP({id:'E',ag:'男 35',arr:0,hp:60,needs:{airway:7},base:1,look:'仰向けで動かない。いびきのような音',find:['いびき様呼吸（舌根沈下）','顔面に多数の擦過傷'],good:{jcs:30,rr:14,hr:96,sbp:136,spo2:96},bad:{rr:6,hr:40,sbp:60,spo2:55},
+    tip:'最初の1〜2ターンで気道確保に1人を張り付けられるかが分かれ目。医師が来たら挿管で人手を解放できる。'}),
+  mkP({id:'H',ag:'男 81',arr:0,hp:0,cpa:true,black0:true,look:'車外に倒れている。動かない',find:['気道確保後も呼吸なし','頭部の高度な変形'],
+    tip:'MCIでは気道確保しても呼吸がなければ黒。CPRに2人を割くと、救える人が救えなくなる。'}),
+  mkP({id:'L',ag:'女 30',arr:0,hp:100,walk:true,look:'右足を引きずって歩いてきた',find:['右足首の腫れ（歩行は可能）'],good:{rr:18,hr:88,sbp:118,spo2:99},
+    tip:'緑。早い段階で救急車に乗せると、赤の搬送が遅れる。'}),
+  mkP({id:'C',ag:'男 41',arr:1,hp:70,needs:{o2:3,chest:3},base:1,anat:['胸郭動揺'],look:'苦しそうに浅く速い呼吸',find:['右胸郭の奇異呼吸（胸郭動揺）','右胸部痛'],good:{rr:28,hr:100,sbp:130,spo2:95},bad:{spo2:66},
+    tip:'胸郭動揺は解剖学的に赤。酸素で時間を稼ぎ、医師の胸腔ドレナージで安定させてから三次へ。'}),
+  mkP({id:'D',ag:'女 73',arr:1,hp:95,base:.3,look:'座り込んで手首を押さえている',find:['左手関節の変形','両膝の痛みで立てない'],good:{rr:20,hr:90,sbp:150,spo2:96},
+    tip:'黄。副子固定で十分。手を掛けすぎず、二次病院へ。'}),
+  mkP({id:'I',ag:'男 19',arr:1,hp:95,base:.2,look:'座って頭を抱えている。会話はできる',find:['後頭部の血腫','めまいで立てない'],good:{jcs:1,rr:18,hr:78,sbp:142,spo2:98},bad:{rr:8,hr:50,sbp:190,spo2:80},
+    tip:'意識清明期のある頭部外傷。16:12に急に意識が落ちる。誰も見ていなければ気づけない。定期的な再評価が鍵。'}),
+  mkP({id:'F',ag:'男 63',arr:2,hp:88,needs:{shock:5},base:1,look:'横になって腹を押さえている',find:['腹部の打撲痕と圧痛'],good:{rr:20,hr:86,sbp:132,spo2:97},bad:{rr:36,hr:160,sbp:40,spo2:80},
+    tip:'到着時は黄に見える隠れショック。再評価で血圧低下と頻脈を拾い、赤へアップトリアージ。輸液で時間を稼ぐ。'}),
+  mkP({id:'G',ag:'女 56',arr:2,hp:80,needs:{pelvis:4},base:1,anat:['骨盤骨折疑い'],look:'腰の痛みを訴えて動けない',find:['恥骨部の皮下血腫','右下肢の外旋（骨盤骨折疑い）'],good:{rr:20,hr:90,sbp:130,spo2:97},bad:{spo2:85},
+    tip:'骨盤骨折は解剖学的に赤。骨盤固定具（1つしかない）を最優先で。'}),
+  mkP({id:'J',ag:'女 78',arr:2,hp:70,needs:{glucose:4},look:'呼びかけに目を開けるが、話が通じない',find:['外傷は軽微','所持品のお薬手帳にインスリンの記載','昼食を食べていないと同行者'],good:{jcs:20,rr:18,hr:88,sbp:150,spo2:96},bgl:38,
+    tip:'意識障害の原因は外傷とは限らない。血糖測定→指示→ブドウ糖で回復すれば黄に下げられ、三次の枠が1つ空く。'}),
+  mkP({id:'K',ag:'男 45',arr:2,hp:75,base:.5,trapped:1,crush:1,rescueT:14,anatR:['長時間の圧迫'],look:'車内で両脚を挟まれている（救出中）',find:['両大腿部が座席と車体に挟まれている','重量物による長時間の圧迫（救出は16:28見込み）'],good:{rr:22,hr:100,sbp:120,spo2:96},
+    tip:'クラッシュ症候群。救出前に静脈路確保と輸液をしておかないと、救出直後に高カリウム血症で心停止の危険。'})
+]}
+const ACTS=[
+  {k:'obs',n:'観察・評価',r:0,st:1,t:1,ok:p=>1},
+  {k:'o2',n:'酸素投与',r:0,st:1,t:1,it:'o2',ok:p=>!p.o2&&!p.cpa},
+  {k:'jaw',n:'気道確保（張り付き）',r:0,st:1,hold:1,ok:p=>p.loc==='scene'&&!p.cpa&&!p.intub&&!holders(p,'jaw').length},
+  {k:'bleed',n:'止血・圧迫包帯',r:0,st:1,t:1,ok:p=>p.loc==='scene'&&!p.cpa},
+  {k:'spl',n:'副子固定',r:0,st:1,t:1,ok:p=>p.loc==='scene'&&!p.cpa&&!p.splint},
+  {k:'pel',n:'骨盤固定具',r:0,st:2,t:1,it:'pel',ok:p=>p.loc==='scene'&&!p.cpa&&!p.pelOn},
+  {k:'cpr',n:'CPR（2名張り付き）',r:0,st:2,hold:1,it:'bvm',ok:p=>p.cpa&&p.loc==='scene'&&!holders(p,'cpr').length},
+  {k:'bgl',n:'血糖測定',r:1,st:1,t:1,it:'meter',ret:1,ok:p=>p.loc==='scene'&&!p.cpa&&!p.bglKnown},
+  {k:'order',n:'指示要請（MC医）',r:1,st:1,t:1,ok:p=>!p.order&&!docHere()},
+  {k:'iv',n:'静脈路確保・輸液',r:1,sp:1,st:1,t:1,it:'iv',ok:p=>!p.ivDone},
+  {k:'glu',n:'ブドウ糖投与',r:1,sp:1,st:1,t:1,ok:p=>p.loc==='scene'&&!p.cpa&&!p.gluDone},
+  {k:'adr',n:'アドレナリン投与',r:1,sp:1,st:1,t:1,ok:p=>p.cpa&&p.loc==='scene'&&!p.adr},
+  {k:'intub',n:'気管挿管',r:2,st:1,t:1,ok:p=>p.loc==='scene'&&!p.cpa&&!p.intub},
+  {k:'drain',n:'胸腔ドレナージ',r:2,st:1,t:2,ok:p=>p.loc==='scene'&&!p.cpa&&!p.drain},
+  {k:'decon',n:'除染（脱衣・水洗）',r:0,st:2,t:1,ok:p=>p.loc==='scene'&&p.contam},
+  {k:'selfdecon',n:'歩ける人に自力除染を指示（全員）',r:0,st:1,t:1,ok:p=>p.loc==='scene'&&p.contam&&walkNow(p)},
+  {k:'smr',n:'全脊柱固定',r:0,st:2,t:1,ok:p=>p.loc==='scene'&&!p.cpa&&!p.smr},
+  {k:'pos',n:'左側臥位に保つ',r:0,st:1,t:1,ok:p=>p.loc==='scene'&&!p.cpa&&!p.posDone}
+];
+const ACT=k=>ACTS.find(a=>a.k===k);
+const ITN={o2:'酸素',bvm:'BVM',iv:'輸液セット',pel:'骨盤固定具',meter:'血糖測定器'};
+let SIM=null;
+const P=id=>SIM.pts.find(p=>p.id===id);
+const holders=(p,k)=>SIM.staff.filter(s=>s.st==='hold'&&s.pid===p.id&&(!k||s.act===k));
+const busyOn=p=>SIM.staff.filter(s=>(s.st==='hold'||s.st==='act')&&s.pid===p.id);
+const docHere=()=>SIM.staff.some(s=>s.role==='doc'&&s.st!=='gone');
+const airwayOK=p=>p.intub||holders(p,'jaw').length>0;
+const satisfied=(p,k)=>k==='o2'||k==='co'?p.o2:k==='airway'?airwayOK(p):k==='burnair'?!!p.intub:p.sat.has(k);
+function rate(p){let r=p.base;for(const k in p.needs)if(!satisfied(p,k))r+=p.needs[k];return r}
+const walkNow=p=>p.walk&&p.hp>55&&!p.cpa;
+function vit(p){
+  if(p.cpa)return{cpa:1};
+  const h=Math.max(0,Math.min(1,p.hp/100)),g=p.good,b=p.bad;
+  const jcs=p.hp>=55?g.jcs:p.hp>=30?Math.max(g.jcs,g.jcs<10?10:100):Math.max(g.jcs,200);
+  let spo2=lerp(b.spo2,g.spo2,h);if(p.o2)spo2+=6;if(p.needs.airway&&airwayOK(p))spo2+=4;
+  return{jcs,rr:Math.round(lerp(b.rr,g.rr,h)),hr:Math.round(lerp(b.hr,g.hr,h)),sbp:Math.round(lerp(b.sbp,g.sbp,h)),spo2:Math.min(100,Math.round(spo2))};
+}
+const redV=v=>v.jcs>=10||v.rr>=30||v.rr<10||v.hr>=120||v.hr<50||v.sbp<90||v.sbp>=200||v.spo2<90;
+const catOf=(v,p,w)=>v.cpa?0:(redV(v)||p.anat.length)?1:w?3:2;
+const trueCat=p=>catOf(vit(p),p,walkNow(p));
+function snap(p){p.snap=vit(p);p.snapWalk=walkNow(p);p.snapT=SIM.t;p.seen=true;p.snapCat=catOf(p.snap,p,p.snapWalk)}
+const lg=(p,x)=>p.log.push(`${fmtT(SIM.t)} ${x}`);
+
+function initSim(solo,id){
+  const C=SIMS[id];
+  SIM={t:0,solo,id,cfg:C,maxT:C.maxT||20,pts:C.pts(),hosp:C.hosp.map(h=>({...h,used:0})),items:{...C.items},
+    staff:C.staff.map((x,k)=>({id:'s'+k,n:x[0],role:['emt','para','doc'][x[1]],st:'free'})),
+    veh:C.veh.map(v=>({...v})),prompts:[],done:false,departed:0};
+  if(!solo&&C.hint)C.hint(SIM);
+  arrivals(0,[]);
+  G.inSim=true;G.solo=!!solo;
+}
+function arrivals(t,msgs){
+  const a=SIM.pts.filter(p=>p.arr===t);
+  a.forEach(p=>{p.loc=p.trapped?'rescue':'scene';p.arrT=t;lg(p,p.trapped?'救出現場で発見（挟まれ）':'救護所に搬入')});
+  const sc=a.filter(p=>!p.trapped);
+  if(sc.length)msgs.push({c:'arr',x:`搬入：${sc.map(p=>p.id+'さん').join('、')}`});
+  a.filter(p=>p.trapped).forEach(p=>msgs.push({c:'arr',x:`救助隊より：${p.id}さん（${p.ag}）が挟まれている。救出完了は${fmtT(p.rescueT)}の見込み`}));
+}
+function guideDefault(){try{return localStorage.getItem('gc-guide')!=='done'}catch(e){return true}}
+function simReady(solo,id){
+  bgm('aid');
+  id=id||'bus';const C=SIMS[id];
+  stage.innerHTML=`<div class="ready"><span class="dlabel" style="align-self:flex-start">救護所シミュレーション</span><h2>救護所を回せ</h2>
+   <ul><li>1ターン＝2分。${fmtT(0)}から${fmtT(C.maxT||20)}まで${C.maxT||20}ターン。傷病者は${C.pts().length}名</li>${C.rules?C.rules.map(r=>`<li>${r}</li>`).join(''):''}
+   <li>傷病者をタップして、観察・タグ付け・処置を指示する。人員は資格の低い順に自動で割り当てる</li>
+   <li>容態は観察した時点の値しか見えない。人が付いている傷病者だけ、毎ターン最新になる</li>
+   <li>救急車が来たら、そのまま搬送に使うか、クルーを救護所に回すかを決める</li>
+   <li>救命士の特定行為には指示要請が要る。医師が着いたら直接指示に切り替わる</li>
+   <li>評価は、防ぎえた死・赤の見逃し時間・搬送先の適否</li></ul>
+   <label class="gchk"><input type="checkbox" id="gchk" ${guideDefault()?'checked':''}> 最初の2ターンは操作ガイドを表示する</label>
+   <div class="btns"><button class="primary" id="st" type="button">救護所を開設する</button><button class="ghost" id="ck" type="button">基準カードを確認する</button></div></div>`;
+  if(solo){G.solo=true;saveGame()}
+  $('#st').onclick=()=>{const gw=$('#gchk').checked;initSim(solo,id);setChap(4);simRender();if(gw)guideStart()};
+  $('#ck').onclick=()=>sheet(...CHEAT.sim,[['閉じる']]);
+}
+function vline(p){
+  if(!p.seen)return`<span class="vl unk">未観察：${p.look}</span>`;
+  const v=p.snap;if(v.cpa)return`<span class="vl">心肺停止</span>`;
+  return`<span class="vl">JCS ${v.jcs}　呼吸 ${v.rr}　脈 ${v.hr}　血圧 ${v.sbp}　SpO2 ${v.spo2}%${p.snapWalk?'　歩行可':''}</span>`;
+}
+const ago=p=>!p.seen?'':SIM.t-p.snapT===0?'最新':`${(SIM.t-p.snapT)*2}分前`;
+function stLine(p){
+  const w=busyOn(p).map(s=>`${s.n}:${ACT(s.act).n.replace(/（.*）/,'')}`);
+  const f=[p.o2&&'酸素',p.pelOn&&'骨盤固定',p.ivDone&&'輸液',p.intub&&'挿管',p.drain&&'ドレーン',p.splint&&'副子',p.gluDone&&'ブドウ糖',p.contam&&'要除染',p.smr&&'全脊柱固定',p.posDone&&'左側臥位',p.order&&!docHere()&&'指示あり',p.bglKnown&&`BS ${p.bgl}`].filter(Boolean);
+  const all=w.concat(f);return all.length?`<span class="who">${all.join('／')}</span>`:'';
+}
+function pcard(p){
+  const tc=p.tag===null?'var(--tag-n)':TAGC[p.tag];
+  return`<button type="button" class="pc ${p.cpa&&p.seen?'cpa':''}" style="--tc:${tc}" data-p="${p.id}"><span class="id">${p.id}</span><span class="ag">${p.ag}</span><span class="ago">${ago(p)}</span>${vline(p)}${stLine(p)}</button>`;
+}
+function simRender(){
+  if(!SIM)return;const t=SIM.t;
+  const freeS=SIM.staff.filter(s=>s.st==='free');
+  const cnt=r=>freeS.filter(s=>s.role===r).length, tot=r=>SIM.staff.filter(s=>s.role===r&&s.st!=='gone').length;
+  const nx=SIM.cfg.sched.find(x=>x.t>t);
+  const nxt=nx?`次の到着 ${fmtT(nx.t)}：${nx.veh||nx.team||(nx.doc?'DMAT医師':nx.heli?'ドクターヘリ':'緑用マイクロバス')}`:'';
+  const here=SIM.pts.filter(p=>p.loc==='scene'||p.loc==='rescue');
+  const gp=[['救出中',here.filter(p=>p.loc==='rescue')],['未判定',here.filter(p=>p.loc==='scene'&&p.tag===null)],['赤',here.filter(p=>p.loc==='scene'&&p.tag===1)],['黄',here.filter(p=>p.loc==='scene'&&p.tag===2)],['緑',here.filter(p=>p.loc==='scene'&&p.tag===3)],['黒',here.filter(p=>p.loc==='scene'&&p.tag===0)]];
+  const vh=SIM.veh.filter(v=>!v.gone).length, gone=SIM.pts.filter(p=>p.loc==='gone').length;
+  stage.innerHTML=`<div class="sim">
+   <div class="simtop"><span class="clock">${fmtT(t)}</span><span class="turn">ターン ${t+1}/${SIM.maxT}</span><span class="nexta">${nxt}</span></div>
+   <div class="rrow"><span class="chip ${cnt('doc')?'':'zero'}">医師 <b>${cnt('doc')}/${tot('doc')}</b></span><span class="chip ${cnt('para')?'':'zero'}">救命士 <b>${cnt('para')}/${tot('para')}</b></span><span class="chip ${cnt('emt')?'':'zero'}">隊員 <b>${cnt('emt')}/${tot('emt')}</b></span>
+    ${Object.keys(ITN).map(k=>`<span class="chip ${SIM.items[k]?'':'zero'}">${ITN[k]} <b>${SIM.items[k]}</b></span>`).join('')}</div>
+   <div class="plist" id="pl">${gp.filter(g=>g[1].length).map(g=>`<div class="grp">${g[0]}（${g[1].length}）</div>${g[1].map(pcard).join('')}`).join('')}${gone?`<div class="grp">搬送済み ${gone}名</div>`:''}</div>
+   <div class="simfoot"><button class="ghost" id="vb" type="button">搬送 ${vh}台</button><button class="ghost" id="sb" type="button">人員</button><button class="ghost" id="cb" type="button" aria-label="基準カード">基準</button><button class="primary" id="eb" type="button">ターン終了 ▶</button></div></div>`;
+  stage.querySelectorAll('.pc').forEach(b=>b.onclick=()=>openP(b.dataset.p));
+  $('#vb').onclick=openVeh;$('#sb').onclick=openStaff;$('#eb').onclick=endTurn;
+  $('#cb').onclick=()=>sheet(...CHEAT.sim,[['閉じる']]);
+  saveGame();if(GD.on)guideShow();
+}
+function check(p,a){
+  if(busyOn(p).some(s=>s.act===a.k))return{err:'実施中'};
+  if(p.contam&&!['obs','jaw','o2','decon','selfdecon','cpr','order','iv'].includes(a.k))return{err:'除染が先（汚染されたまま処置はできない）'};
+  if(p.contam&&a.k==='iv')return{err:'除染が先（汚染されたまま処置はできない）'};
+  if(a.it&&SIM.items[a.it]<=0)return{err:`${ITN[a.it]}が残っていない`};
+  const pool=SIM.staff.filter(s=>s.st==='free'&&ROLE[s.role]>=a.r).sort((x,y)=>ROLE[x.role]-ROLE[y.role]);
+  if(pool.length<a.st)return{err:`空いている${RN[a.r]}${a.r<2?'以上':''}が${a.st}名必要`};
+  const staff=pool.slice(0,a.st),isDoc=staff.some(s=>s.role==='doc');
+  if(a.sp&&!isDoc){
+    if(!(p.order||docHere()))return{err:'先に指示要請が必要'};
+    if(a.k==='iv'){const v=vit(p);if(!(p.cpa||p.crush||v.sbp<90||v.hr>=120))return{err:'救命士の心停止前輸液はショック・クラッシュ症候群疑いが対象'}}
+  }
+  if(a.k==='glu'){if(!p.bglKnown)return{err:'先に血糖測定が必要'};if(p.bgl>=50)return{err:'血糖値50以上のため適応なし'}}
+  if(a.k==='adr'&&!holders(p,'cpr').length)return{err:'CPR実施中であることが条件'};
+  return{staff};
+}
+function doAct(p,a){
+  const r=check(p,a);if(r.err)return toast(r.err);
+  r.staff.forEach(s=>{s.st=a.hold?'hold':'act';s.pid=p.id;s.act=a.k;s.left=a.t||0});
+  if(a.it)SIM.items[a.it]--;
+  const nm=r.staff.map(s=>s.n).join('・');
+  if(a.hold)lg(p,`${a.n.replace(/（.*）/,'')}開始（${nm}）`);
+  setTimeout(()=>guide('act'),0);sfx('act');toast(`${nm} → ${p.id}さん：${a.n}${a.hold?'':'（このターン）'}`);
+  renderP();
+}
+function release(s){
+  const p=P(s.pid);
+  if(s.act==='cpr'&&holders(p,'cpr').length===2){holders(p,'cpr').forEach(h=>{h.st='free';h.pid=null;h.act=null});SIM.items.bvm++;lg(p,'CPR中止');return}
+  if(s.st==='act'){const a=ACT(s.act);if(a.it)SIM.items[a.it]++}
+  if(s.act==='jaw')lg(p,`気道確保を解除（${s.n}）`);
+  s.st='free';s.pid=null;s.act=null;
+}
+let curP=null;
+function openP(id){setTimeout(()=>guide('open'),0);
+  curP=id;const ov=document.createElement('div');ov.className='ov';ov.id='pov';
+  ov.innerHTML='<div class="sheet psh" role="dialog" aria-modal="true" id="psh"></div>';
+  document.body.appendChild(ov);renderP();
+}
+function closeP(){const o=$('#pov');o&&o.remove();curP=null;simRender();guide('close')}
+function renderP(){
+  const box=$('#psh');if(!box||!curP)return;const p=P(curP),v=p.snap;
+  const vg=!p.seen?`<p class="note">未観察。${p.look}</p>`:v.cpa?`<p><b style="color:var(--siren)">心肺停止</b>　<span class="note">${ago(p)}</span></p>`:
+   `<div class="lbl">バイタル（${ago(p)}）</div><div class="vgrid">${[['JCS',v.jcs,v.jcs>=10],['呼吸',v.rr,v.rr>=30||v.rr<10],['脈拍',v.hr,v.hr>=120||v.hr<50],['血圧',v.sbp,v.sbp<90||v.sbp>=200],['SpO2',v.spo2,v.spo2<90]].map(x=>`<div>${x[0]}<b class="${x[2]?'red':''}">${x[1]}</b></div>`).join('')}</div>
+    <p style="font-size:14px">歩行：${p.snapWalk?'可':'不可'}${p.bglKnown?`　血糖：<b class="${p.bgl<50?'red':''}">${p.bgl} mg/dL</b>`:''}</p>`;
+  const acts=ACTS.filter(a=>a.ok(p)&&(p.loc==='scene'||['obs','o2','order','iv'].includes(a.k))).map(a=>{
+    const r=check(p,a),req=`${RN[a.r]}${a.st>1?a.st+'名':''}${a.it?'・'+ITN[a.it]:''}${a.hold?'・継続':a.t>1?'・'+a.t+'ターン':''}`;
+    return`<button type="button" class="act ${r.err?'dis':''}" data-a="${a.k}">${a.n}<small>${r.err||req}</small></button>`}).join('');
+  const ws=busyOn(p).map(s=>`<div><span>${s.n}（${RN[ROLE[s.role]]}）：${ACT(s.act).n}${s.st==='act'?'　このターン':''}</span>${s.st==='hold'?`<button class="ghost sm" data-r="${s.id}" type="button">外す</button>`:`<button class="ghost sm" data-r="${s.id}" type="button">取消</button>`}</div>`).join('');
+  box.innerHTML=`<h3>${p.id}さん　<span style="font-family:var(--f-body);font-size:15px;color:var(--fg)">${p.ag}</span></h3>
+   <span class="loc">${p.loc==='rescue'?'救出現場（挟まれ）':'救護所'}</span>
+   ${vg}
+   ${p.seen?`<ul class="finds">${p.find.map(f=>`<li>${f}</li>`).join('')}</ul>`:''}
+   ${p.loc==='scene'?`<div class="lbl">トリアージタグ</div><div class="tagbtns">${[3,2,1,0].map(k=>`<button type="button" class="s${k} ${p.tag===k?'on':''}" data-t="${k}">${TAGN[k]}</button>`).join('')}</div>`:''}
+   ${ws?`<div class="lbl">対応中</div><div class="who-l">${ws}</div>`:''}
+   <div class="lbl">指示する</div><div class="acts">${acts}</div>
+   <button class="primary" id="pclose" type="button">救護所に戻る</button>`;
+  box.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{setTimeout(()=>guide('tag'),0);const k=+b.dataset.t;if(p.tag!==k){p.tag=k;lg(p,`タグ：${TAGN[k]}`)}
+    if(SIM.pts.every(q=>q.loc!=='scene'||q.tag!==null)&&SIM.t>=2)setChap(5);renderP()});
+  box.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>doAct(p,ACT(b.dataset.a)));
+  box.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{release(SIM.staff.find(s=>s.id===b.dataset.r));renderP()});
+  $('#pclose').onclick=closeP;
+  if(GD.on)guideShow();
+}
+function openStaff(){
+  const rows=SIM.staff.filter(s=>s.st!=='gone').map(s=>`<div><span><b>${s.n}</b>（${RN[ROLE[s.role]]}）　${s.st==='free'?'<span style="color:var(--ok)">空き</span>':`${s.pid}さん：${ACT(s.act).n}${s.st==='act'&&s.left>1?`（残り${s.left}ターン）`:''}`}</span></div>`).join('');
+  const out=SIM.staff.filter(s=>s.st==='gone').map(s=>s.n).join('、');
+  sheet('人員',`<div class="who-l">${rows}</div>${out?`<p class="note">搬送に同乗して離脱：${out}</p>`:''}`,[['閉じる',simRender]]);
+}
+function openVeh(){
+  const vs=SIM.veh.filter(v=>!v.gone);
+  const hs=SIM.hosp.map(h=>`<div><span>${h.n}（${h.m}）</span><b>${h.cap-h.used}/${h.cap}</b></div>`).join('');
+  const ov=document.createElement('div');ov.className='ov';
+  ov.innerHTML=`<div class="sheet"><h3>搬送</h3>${vs.length?`<div class="who-l">${vs.map(v=>`<div><span><b>${v.n}</b>　${v.heli?`医師・看護師搭乗／赤1名→${SIM.hosp.find(h=>h.id===v.dest).n}`:v.bus?'緑4名まで→クリニック群':v.crew>=2?'クルー待機中':'クルーなし（救護所から2名を同乗させる）'}</span><button class="ghost sm" data-v="${v.id}" type="button">搬送する</button></div>`).join('')}</div>`:'<p class="note">現場に車両がない。</p>'}
+   <div class="lbl">医療機関の受入枠（残り/上限）</div><div class="who-l">${hs}</div><div class="btns"><button class="primary" id="vc" type="button">閉じる</button></div></div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#vc').onclick=()=>{ov.remove();simRender()};
+  ov.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ov.remove();openDepart(SIM.veh.find(v=>v.id===b.dataset.v))});
+}
+function openDepart(v){
+  const cand=SIM.pts.filter(p=>p.loc==='scene'&&!p.cpa);
+  const needCrew=!v.heli&&!v.bus&&v.crew<2;
+  const freeS=SIM.staff.filter(s=>s.st==='free');
+  const sel=new Set(),crew=new Set();let hid=v.heli?v.dest:v.bus?'cli':null,err='';
+  const ov=document.createElement('div');ov.className='ov';document.body.appendChild(ov);
+  const maxN=()=>v.heli?1:v.bus?4:[...sel].some(id=>P(id).tag===1)?1:2;
+  const draw=()=>{
+    ov.innerHTML=`<div class="sheet"><h3>${v.n}で搬送</h3>
+     <div class="lbl">乗せる傷病者（${v.heli?'赤1名':v.bus?'緑4名まで':'赤なら1名、黄・緑なら2名まで'}）</div>
+     <div class="pick">${cand.map(p=>`<button type="button" data-p="${p.id}" class="${sel.has(p.id)?'on':''}"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${p.tag===null?'var(--tag-n)':TAGC[p.tag]};margin-right:6px"></span><b>${p.id}</b>　${p.ag}　${p.tag===null?'未判定':TAGN[p.tag]}</button>`).join('')||'<p class="note">搬送できる傷病者がいない。</p>'}</div>
+     ${v.heli||v.bus?`<p class="note">搬送先：${SIM.hosp.find(h=>h.id===hid).n}</p>`:`<div class="lbl">搬送先</div><div class="pick">${SIM.hosp.filter(h=>h.id!=='cli'||true).map(h=>`<button type="button" data-h="${h.id}" class="${hid===h.id?'on':''}" ${h.cap-h.used<1?'disabled':''}>${h.n}（${h.m}）残り${h.cap-h.used}</button>`).join('')}</div>`}
+     ${needCrew?`<div class="lbl">同乗させる人員を2名（救護所から離脱する）</div><div class="pick">${freeS.map(s=>`<button type="button" data-s="${s.id}" class="${crew.has(s.id)?'on':''}">${s.n}（${RN[ROLE[s.role]]}）</button>`).join('')||'<p class="note">空いている人員がいない。</p>'}</div>`:''}
+     <p class="err">${err}</p>
+     <div class="btns"><button class="primary" id="go" type="button">出発</button><button class="ghost" id="cx" type="button">やめる</button></div></div>`;
+    ov.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{const id=b.dataset.p;err='';if(sel.has(id))sel.delete(id);else{sel.add(id);if(sel.size>maxN()){sel.delete(id);err='これ以上は乗せられない'}}draw()});
+    ov.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{hid=b.dataset.h;err='';draw()});
+    ov.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{const id=b.dataset.s;err='';if(crew.has(id))crew.delete(id);else if(crew.size<2)crew.add(id);draw()});
+    ov.querySelector('#cx').onclick=()=>{ov.remove();simRender()};
+    ov.querySelector('#go').onclick=()=>{
+      const h=SIM.hosp.find(x=>x.id===hid);
+      if(!sel.size)err='傷病者を選んでください';
+      else if(!h)err='搬送先を選んでください';
+      else if(h.cap-h.used<sel.size)err='受入枠が足りない';
+      else if(v.bus&&[...sel].some(id=>P(id).tag!==3))err='バスに乗せられるのは緑タグだけ';
+      else if(v.heli&&P([...sel][0]).tag!==1)err='ドクターヘリは赤タグの傷病者に使う';
+      else if([...sel].some(id=>P(id).contam))err='除染前の傷病者は搬送できない（車内が汚染される）';
+      else if(needCrew&&crew.size<2)err='同乗する人員を2名選んでください';
+      if(err)return draw();
+      ov.remove();depart(v,[...sel],hid,[...crew]);
+    };
+  };
+  draw();
+}
+function depart(v,pids,hid,crewIds){
+  const h=SIM.hosp.find(x=>x.id===hid),T=v.heli?v.ft:h.t;
+  const crewS=crewIds.map(id=>SIM.staff.find(s=>s.id===id));
+  crewS.forEach(s=>s.st='gone');
+  pids.forEach(id=>{
+    const p=P(id);
+    busyOn(p).forEach(s=>release(s));
+    if(p.o2)SIM.items.o2++;
+    const cat=trueCat(p);
+    const skip=v.heli?['o2','co','airway','bleed','shock','chest','glucose','crush','supine','burnair','mi']:['o2','co','airway','bleed','supine'];
+    let r=p.base*(v.heli?.5:1);for(const k in p.needs)if(!skip.includes(k)&&!satisfied(p,k))r+=p.needs[k];
+    const died=p.hp-r*T*.7<=0;
+    let pen=0,note='';
+    const prefOK=p.pref&&h.id===p.pref;
+    if(prefOK){}
+    else if(cat===1&&h.lv<3){pen=2;note='赤を三次以外へ搬送'}
+    else if(cat===3&&h.lv===3){pen=1;note='緑で三次の枠を使用'}
+    else if(cat===2&&h.lv===3){pen=1;note='黄で三次の枠を使用'}
+    else if(cat<3&&h.lv===1){pen=2;note='緑用の医療機関へ黄・赤を搬送'}
+    if(cat===3&&!v.bus&&!v.heli&&h.lv>1&&SIM.t<10&&!note){note='早い段階で緑に救急車を使用'}
+    if(p.pref&&h.id!==p.pref&&!note){pen+=1;note=p.prefWhy}
+    p.out={via:v.n,h:h.n,dep:SIM.t,arr:SIM.t+T,died,cat,pen,note};
+    h.used++;p.loc='gone';
+    lg(p,`${v.n}で${h.n}へ出発（${fmtT(SIM.t+T)}着${died?'・搬送中に心停止':''}）`);
+  });
+  v.gone=true;SIM.departed++;setChap(6);
+  sfx('depart');toast(`${v.n} 出発：${pids.map(x=>x+'さん').join('、')} → ${h.n}`);
+  simRender();
+}
+function endTurn(){
+  if(GD.on){const st=GSTEPS[GD.i];if(st&&st.on!=='turn'&&GD.i<5)GD.i=5}guide('turn');
+  if(!SIM||SIM.done)return;
+  const msgs=[],t=SIM.t;
+  const mon=new Set(SIM.staff.filter(s=>(s.st==='act'||s.st==='hold')&&s.pid).map(s=>s.pid));
+  const prev={};SIM.pts.forEach(p=>prev[p.id]=p.snapCat);
+  const doneSet=new Set();
+  SIM.staff.filter(s=>s.st==='act').forEach(s=>{
+    s.left--;if(s.left>0)return;
+    const p=P(s.pid),key=p.id+s.act;
+    if(!doneSet.has(key)){doneSet.add(key);applyAct(s.act,p,s,msgs)}
+    s.st='free';s.pid=null;s.act=null;
+  });
+  SIM.pts.forEach(p=>{
+    if(p.loc!=='scene'&&p.loc!=='rescue')return;
+    if(p.cpa){
+      if(holders(p,'cpr').length){p.cprT=(p.cprT||0)+1;
+        if(p.adr&&!p.black0&&Math.random()<.06){p.cpa=false;p.hp=20;p.needs={airway:6};p.base=2;msgs.push({c:'arr',x:`${p.id}さん：心拍再開（ROSC）`});lg(p,'心拍再開')}}
+      return}
+    p.hp-=rate(p);
+    if(p.hp<=0){p.hp=0;p.cpa=true;p.diedT=t+1;
+      busyOn(p).forEach(s=>release(s));if(p.o2){p.o2=false;SIM.items.o2++}
+      msgs.push({c:'bad',x:`${p.id}さんが心肺停止（周囲の傷病者が叫んで知らせた）`});lg(p,'心肺停止');mon.add(p.id)}
+  });
+  SIM.pts.forEach(p=>{if(p.loc==='scene'&&!p.cpa&&p.arrT<t&&trueCat(p)===1&&p.tag!==1)p.underT++});
+  SIM.t++;
+  mon.forEach(id=>{const p=P(id);if(p.loc==='gone')return;snap(p);
+    if(!p.cpa&&p.snapCat===1&&prev[id]!==undefined&&prev[id]!==1){const v=p.snap;msgs.push({c:'bad',x:`${p.id}さんの容態が悪化（付いている隊員より）：JCS ${v.jcs}・脈 ${v.hr}・血圧 ${v.sbp}・SpO2 ${v.spo2}`})}});
+  events(SIM.t,msgs);
+  if(SIM.t>=SIM.maxT){finishSim();return}
+  const title=`${fmtT(t)} → ${fmtT(SIM.t)}`;
+  sfx('turn');setTimeout(()=>{if(msgs.some(m=>/心肺停止/.test(m.x)))sfx('flat');else if(msgs.some(m=>m.c==='bad'))sfx('alarm');if(msgs.some(m=>/救急\d|ドクターヘリ|マイクロバス/.test(m.x)&&m.c==="arr"))setTimeout(()=>sfx('siren'),300)},250);
+  const body=msgs.length?`<ul class="msgs">${msgs.map(m=>`<li class="${m.c||''}">${m.x}</li>`).join('')}</ul>`:'<p class="note">特に報告なし。見ていない傷病者の変化は、観察しないとわからない。</p>';
+  sheet(title,body,[['続ける',runPrompts]]);
+}
+function applyAct(k,p,s,msgs){
+  const a=ACT(k);
+  switch(k){
+    case'obs':break;
+    case'o2':p.o2=true;break;
+    case'bleed':if(p.needs.bleed){p.sat.add('bleed')}break;
+    case'spl':p.splint=true;if(p.id==='D')p.base=0;break;
+    case'pel':p.pelOn=true;if(p.needs.pelvis)p.sat.add('pelvis');msgs.push({x:`${p.id}さん：骨盤固定具を装着`});break;
+    case'bgl':p.bglKnown=true;SIM.items.meter++;msgs.push({x:`${p.id}さん：血糖 ${p.bgl} mg/dL`});break;
+    case'order':p.order=true;msgs.push({x:`${p.id}さん：MC医から特定行為の指示を受けた`});break;
+    case'iv':p.ivDone=true;p.sat.add('shock');p.sat.add('crush');msgs.push({x:`${p.id}さん：静脈路確保・輸液を開始${p.loc==='rescue'?'（救出前輸液）':''}`});break;
+    case'glu':p.gluDone=true;if(p.needs.glucose){p.sat.add('glucose');p.hp=Math.min(100,p.hp+35);p.good.jcs=0;msgs.push({x:`${p.id}さん：ブドウ糖投与後、意識が回復`})}break;
+    case'adr':p.adr=true;break;
+    case'intub':p.intub=true;holders(p,'jaw').forEach(h=>{h.st='free';h.pid=null;h.act=null});msgs.push({x:`${p.id}さん：気管挿管。気道確保の張り付きを解除`});break;
+    case'drain':p.drain=true;p.sat.add('chest');msgs.push({x:`${p.id}さん：胸腔ドレナージ完了`});break;
+    case'decon':p.contam=false;p.sat.add('contam');msgs.push({x:`${p.id}さん：除染完了`});break;
+    case'selfdecon':{const ws=SIM.pts.filter(q=>q.loc==='scene'&&q.contam&&walkNow(q));ws.forEach(q=>{q.contam=false;q.sat.add('contam');if(q!==p)lg(q,'自力除染（誘導）')});msgs.push({x:`自力除染を誘導：${ws.map(q=>q.id+'さん').join('、')}`});break}
+    case'smr':p.smr=true;p.sat.add('spine');break;
+    case'pos':p.posDone=true;p.sat.add('supine');msgs.push({x:`${p.id}さん：左側臥位にして血圧が持ち直した`});break;
+  }
+  lg(p,`${a.n}（${s.n}）`);
+}
+function events(t,msgs){
+  arrivals(t,msgs);
+  SIM.pts.filter(p=>p.trapped&&p.loc==='rescue'&&p.rescueT===t).forEach(K=>{
+    K.loc='scene';K.anat=K.anatR||K.anat;K.find.push('救出完了');Object.assign(K.needs,K.needsR||{});
+    if(K.crush&&!K.ivDone){K.hp-=40;K.needs.crush=6;K.base=1;msgs.push({c:'bad',x:`${K.id}さん救出。直後に脈が弱く不整になった（再灌流による高カリウム血症の疑い）`});lg(K,'救出直後に容態急変')}
+    else{msgs.push({c:'arr',x:`${K.id}さん救出${K.crush?'。救出前輸液のおかげで容態は保たれている':'。救護所へ搬入'}`});lg(K,'救出')}
+    snap(K)});
+  if(SIM.cfg.ev)SIM.cfg.ev(t,msgs);
+  SIM.cfg.sched.filter(x=>x.t===t).forEach(x=>{
+    if(x.doc){SIM.staff.push({id:'doc'+t,n:x.doc,role:'doc',st:'free'});msgs.push({c:'arr',x:`DMATの${x.doc}医師が到着。救命士は医師の直接指示で特定行為ができる`})}
+    if(x.team){x.crew.forEach((c,k)=>SIM.staff.push({id:'tm'+t+k,n:c[0],role:['emt','para','doc'][c[1]],st:'free'}));if(x.items)Object.entries(x.items).forEach(([k,v])=>SIM.items[k]=(SIM.items[k]||0)+v);msgs.push({c:'arr',x:`${x.team}が到着（${x.crew.length}名${x.note?'・'+x.note:''}）`})}
+    if(x.heli){SIM.veh.push({id:'heli'+t,n:'ドクターヘリ',heli:1,cap:1,crew:2,dest:x.dest||'ken',ft:x.ft||5});msgs.push({c:'arr',x:`ドクターヘリが着陸。赤1名を${SIM.hosp.find(h=>h.id===(x.dest||'ken')).n}へ運べる`})}
+    if(x.bus){SIM.veh.push({id:'bus'+t,n:'マイクロバス（緑用）',bus:1,cap:x.cap||4,crew:2});msgs.push({c:'arr',x:'緑の一括搬送用マイクロバスが到着'})}
+    if(x.veh){const v={id:'v'+t,n:x.veh,crew:0,cap:2,crewList:x.crew};SIM.veh.push(v);SIM.prompts.push(v);msgs.push({c:'arr',x:`${x.veh}が到着（救命士1・隊員2）`})}
+  });
+}
+const busEvents=(t,msgs)=>{
+  const I=P('I'),B=P('B');
+  if(t===6&&I.loc==='scene'&&!I.cpa){I.hp=Math.min(I.hp,48);I.needs.airway=6;I.base=1.5;I.find.push('嘔吐あり。呼びかけへの反応が鈍くなった');lg(I,'意識レベル低下');
+    if(busyOn(I).length)msgs.push({c:'bad',x:'Iさんが嘔吐し、反応が鈍くなった（付いている隊員より）'})}
+  if(t===7&&B.loc==='scene'&&!B.cpa){B.sat.delete('bleed');B.needs.bleed=6;B.find.push('圧迫包帯から血液がにじみ出ている（再出血）');lg(B,'再出血');
+    msgs.push({c:'bad',x:'緑エリアのBさんが「また血が出てきた」と訴えている'})}
+};
+function runPrompts(){
+  const v=SIM.prompts.shift();if(!v)return simRender();
+  sheet(`${v.n} 到着`,`<p>クルー：${v.crewList.map(c=>`${c[0]}（${RN[c[1]]}）`).join('、')}</p><p class="note">救護所に回すと、人員3名に加えて酸素1本と輸液セット1つが増える。その代わり、この車両で搬送するときは救護所から2名を同乗させる必要がある。</p>`,
+   [['搬送待機にする（クルーは車両に残る）',()=>{v.crew=3;runPrompts()}],
+    ['クルーを救護所の活動に回す',()=>{v.crewList.forEach((c,k)=>SIM.staff.push({id:v.id+'s'+k,n:c[0],role:c[1]?'para':'emt',st:'free'}));SIM.items.o2++;SIM.items.iv++;v.crew=0;runPrompts()}]]);
+}
+function simScore(){
+  const ps=SIM.pts;
+  const dead=ps.filter(p=>!p.black0&&((p.cpa&&p.loc!=='gone')||(p.out&&p.out.died)));
+  const under=ps.reduce((a,p)=>a+p.underT,0);
+  const pen=ps.reduce((a,p)=>a+(p.out?p.out.pen:0),0);
+  const remRed=ps.filter(p=>(p.loc==='scene'||p.loc==='rescue')&&!p.cpa&&trueCat(p)===1);
+  const redOut=ps.filter(p=>p.out&&p.out.cat===1&&!p.out.died);
+  const avg=redOut.length?Math.round(redOut.reduce((a,p)=>a+p.out.arr*2,0)/redOut.length):null;
+  const pts=dead.length*3+under*.5+pen+remRed.length*2;
+  return{dead:dead.length,under,pen,remRed:remRed.length,avg,pts,rank:pts<=1?'S':pts<=4?'A':pts<=8?'B':'C'};
+}
+function finishSim(){
+  setTimeout(()=>sfx('rank'),200);
+  bgm('result');
+  SIM.done=true;const sc=simScore();G.sim=sc;setChap(6);G.inSim=false;guideEnd();if(SIM.solo)clearSave();else{G.i++;saveGame();G.i--}
+  const H=SIM.pts.find(p=>p.black0);
+  const rows=SIM.pts.map(p=>{
+    let o,tc=TAGC[p.out?p.out.cat:trueCat(p)];
+    if(p.black0)o=p.tag===0?'黒（正しく判定）':'黒の判定がされていない';
+    else if(p.cpa&&p.loc!=='gone')o=`<span style="color:var(--siren)">心肺停止（${fmtT(p.diedT)}）防ぎえた死</span>`;
+    else if(p.out)o=`${p.out.via}で${p.out.h}へ　${fmtT(p.out.arr)}着${p.out.died?'　<span style="color:var(--siren)">搬送中に心停止</span>':''}${p.out.note?`　<span style="color:var(--weak)">${p.out.note}</span>`:''}`;
+    else o=`現場に残留（${p.loc==='rescue'?'救出中':TAGN[trueCat(p)]}）`;
+    const extra=[p.underT?`赤なのに赤タグでなかった時間 ${p.underT*2}分`:'',p.cprT&&p.black0?`CPRに2名を${p.cprT*2}分割いた`:''].filter(Boolean).join('／');
+    return`<div class="prow" style="--tc:${tc}"><b>${p.id}　${p.ag}</b><span class="o">${o}</span>${extra?`<span class="tip" style="color:var(--weak)">${extra}</span>`:''}<span class="tip">${p.tip}</span><span class="lg">${p.log.slice(-5).join('<br>')}</span></div>`}).join('');
+  stage.innerHTML=`<div class="result"><span class="note">救護所活動 終了（${fmtT(SIM.maxT)}）</span><span class="rank">${sc.rank}</span>
+   <div class="stats"><div><b>${sc.dead}</b>防ぎえた死</div><div><b>${sc.under*2}分</b>赤の見逃し</div><div><b>${sc.remRed}</b>現場に残った赤</div></div>
+   <p class="note">${sc.avg!==null?`赤の病院到着は平均 16:00から${sc.avg}分後。`:''}搬送先の不適切などの減点 ${sc.pen}。</p>
+   <div class="lbl">傷病者ごとの振り返り</div><div class="res" style="gap:8px">${rows}</div>
+   <div class="btns">${SIM.solo?'<button class="primary" id="ag" type="button">もう一度</button><button class="ghost" id="tt" type="button">タイトルへ</button>':'<button class="primary" id="nx" type="button">次へ</button>'}</div></div>`;
+  stage.scrollTop=0;
+  if(SIM.solo){$('#ag').onclick=()=>simReady(true,SIM.id);$('#tt').onclick=()=>{reset();G.i=0;render()}}else $('#nx').onclick=next;
+}
+
+/* ---- Dojo (START sorting) ---- */
+const R=(a,b)=>a+Math.floor(Math.random()*(b-a+1)), pick=a=>a[Math.floor(Math.random()*a.length)];
+let dojoNo=0;
+function genStart(){
+  dojoNo++;const id=String(dojoNo).padStart(2,'0'),ag=`${pick(['男','女'])} ${R(8,89)}`;
+  const crtN=()=>(R(5,20)/10).toFixed(1);
+  if(Math.random()<.22)return{id,ag,walk:'可',br:'あり',rr:String(R(14,26)),circ:`触知可／CRT ${crtN()}秒`,ob:'可',note:pick(['','擦過傷','足首の痛み','頭痛の訴え']),ans:3,why:'歩けるので緑'};
+  if(Math.random()<.13){const ok=Math.random()<.5;
+    return ok?{id,ag,walk:'不可',br:'なし → 気道確保で呼吸出現',rr:String(R(6,12)),circ:'触知弱い',ob:'不可',note:'',ans:1,why:'気道確保で呼吸が出たら赤'}
+             :{id,ag,walk:'不可',br:'なし → 気道確保後も呼吸なし',rr:'—',circ:'—',ob:'—',note:'',ans:0,why:'気道確保後も呼吸なしで黒'}}
+  const r=Math.random(),rr=r<.13?R(6,9):r<.27?R(30,40):r<.35?pick([10,29]):R(11,28);
+  const c=Math.random(),noRad=c<.08,crt=c<.18?(R(25,40)/10):c<.25?2.0:R(8,19)/10;
+  const obey=Math.random()>.14,reasons=[];
+  if(rr>=30||rr<10)reasons.push(`呼吸数${rr}`);
+  if(noRad)reasons.push('橈骨動脈触知不可');else if(crt>2)reasons.push(`CRT ${crt.toFixed(1)}秒`);
+  if(!obey)reasons.push('従命不可');
+  const ans=reasons.length?1:2;
+  return{id,ag,walk:'不可',br:'あり',rr:String(rr),circ:noRad?'触知不可':`触知可／CRT ${crt.toFixed(1)}秒`,ob:obey?'可':'不可',note:'',ans,
+    why:ans===1?`${reasons[0]}で赤`:(rr===10||rr===29||crt===2?'境界値は基準外（30以上・10未満・2秒超）なので黄':'赤の基準に該当なしで黄')};
+}
+const startCard=p=>`<div class="tg-h"><b>${p.id}</b><span>${p.ag}</span></div>
+ <dl class="tobs"><dt>歩行</dt><dd>${p.walk}</dd><dt>呼吸</dt><dd>${p.br}</dd><dt>呼吸数</dt><dd>${p.rr}</dd><dt>循環</dt><dd>${p.circ}</dd><dt>従命</dt><dd>${p.ob}</dd></dl>${p.note?`<p class="tg-n">${p.note}</p>`:''}`;
+const TB=[{id:'3',label:'緑',sub:'Ⅲ',cls:'s3'},{id:'2',label:'黄',sub:'Ⅱ',cls:'s2'},{id:'1',label:'赤',sub:'Ⅰ',cls:'s1'},{id:'0',label:'黒',sub:'0',cls:'s0'}];
+let SS=null;
+function stopSort(){if(SS){SS.done=true;cancelAnimationFrame(SS.raf);SS=null}}
+function dojo(){bgm('dispatch');document.querySelector('.hud').hidden=false;
+  dojoNo=0;stopDebate();stopSort();G.chapter=4;hud();
+  stage.innerHTML=`<div class="ready"><span class="dlabel" style="align-self:flex-start">仕分けゲーム</span><h2>トリアージ道場（START法）</h2>
+   <ul><li>ランダムに生成された傷病者が途切れずに来る</li><li>60秒で何名正しく仕分けられるか</li><li>境界値（呼吸数10・29・30、CRT 2.0秒）も出る</li><li>カードを箱へドラッグするか、箱をタップ。間違えると5秒減る</li></ul>
+   <div class="btns"><button class="primary" id="st" type="button">開始（60秒）</button><button class="ghost" id="ck" type="button">START法を確認する</button></div></div>`;
+  $('#st').onclick=runSort;$('#ck').onclick=()=>sheet(...CHEAT.start,[['閉じる']]);
+}
+function runSort(){
+  stopSort();
+  SS={left:60000,last:performance.now(),paused:false,item:null,n:0,ok:0,miss:[],raf:0,busy:false,done:false};
+  stage.innerHTML=`<div class="sort">
+   <div class="dhead"><span class="dlabel">仕分け</span><span class="dtitle">トリアージ道場</span><span class="timer" id="tm"></span></div>
+   <div class="srow"><span id="prog"></span><button class="ghost sm" id="ch" type="button">START法</button></div>
+   <div class="deck" id="deck"></div>
+   <div class="flash" id="fl">カードを箱へドラッグするか、箱をタップ。</div>
+   <div class="bins">${TB.map(b=>`<button type="button" class="bin ${b.cls}" data-b="${b.id}"><b>${b.label}</b><small>${b.sub}</small></button>`).join('')}</div></div>`;
+  stage.querySelectorAll('.bin[data-b]').forEach(b=>b.onclick=()=>place(b.dataset.b));
+  $('#ch').onclick=()=>{SS.paused=true;sheet(...CHEAT.start,[['戻る',()=>{if(SS){SS.paused=false;SS.last=performance.now()}}]])};
+  nextItem();SS.raf=requestAnimationFrame(tick);
+}
+function tick(){
+  if(!SS||SS.done)return;const now=performance.now();
+  if(!SS.paused)SS.left-=now-SS.last;SS.last=now;
+  const t=$('#tm');t.textContent=(Math.max(0,SS.left)/1000).toFixed(1);t.classList.toggle('low',SS.left<10000);
+  if(SS.left<=0){finishSort();return}
+  SS.raf=requestAnimationFrame(tick);
+}
+function nextItem(){
+  if(!SS)return;const it=genStart();SS.item=it;SS.busy=false;
+  $('#prog').textContent=`正解 ${SS.ok}　判定 ${SS.n}`;
+  $('#deck').innerHTML=`<div class="tag" id="card">${startCard(it)}</div>`;
+  drag($('#card'));
+}
+function binAt(x,y){return [...stage.querySelectorAll('.bin[data-b]')].find(b=>{const r=b.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom})}
+function drag(card){
+  let sx=0,sy=0,on=false,hot=null;
+  card.onpointerdown=e=>{if(SS.busy)return;on=true;sx=e.clientX;sy=e.clientY;card.setPointerCapture(e.pointerId);card.classList.add('drag')};
+  card.onpointermove=e=>{if(!on)return;const dx=e.clientX-sx,dy=e.clientY-sy;card.style.transform=`translate(${dx}px,${dy}px) rotate(${dx/25}deg)`;
+    const b=binAt(e.clientX,e.clientY);if(b!==hot){hot&&hot.classList.remove('hot');hot=b;hot&&hot.classList.add('hot')}};
+  const up=e=>{if(!on)return;on=false;card.classList.remove('drag');hot&&hot.classList.remove('hot');
+    const b=binAt(e.clientX,e.clientY);hot=null;
+    if(b&&Math.hypot(e.clientX-sx,e.clientY-sy)>12)place(b.dataset.b);else card.style.transform=''};
+  card.onpointerup=up;card.onpointercancel=up;
+}
+function place(bid){
+  if(!SS||SS.busy||!SS.item||SS.done)return;
+  const it=SS.item,ok=+bid===it.ans,why=`${it.id}：${TAGN[it.ans]}。${it.why}`;
+  SS.busy=true;SS.n++;const fl=$('#fl');
+  sfx(ok?'good':'wrong');
+  if(ok){SS.ok++;fl.className='flash ok';fl.innerHTML=`<b style="color:var(--ok)">○</b>${why}`}
+  else{SS.left-=5000;SS.miss.push(why);fl.className='flash ng';fl.innerHTML=`<b style="color:var(--siren)">× −5秒</b>${why}`;
+    const d=$('#deck');d.classList.remove('shake');void d.offsetWidth;d.classList.add('shake')}
+  const card=$('#card'),target=stage.querySelector(`.bin[data-b="${it.ans}"]`);
+  if(card&&target){const a=card.getBoundingClientRect(),b=target.getBoundingClientRect();
+    card.style.transform=`translate(${b.left+b.width/2-a.left-a.width/2}px,${b.top+b.height/2-a.top-a.height/2}px) scale(.2)`;card.style.opacity='0';
+    target.classList.remove('pulse');void target.offsetWidth;target.classList.add('pulse')}
+  setTimeout(nextItem,ok?300:650);
+}
+function finishSort(){
+  if(!SS||SS.done)return;SS.done=true;cancelAnimationFrame(SS.raf);const s=SS;
+  let best=0;try{best=+localStorage.getItem('ronpa-dojo-best')||0;if(s.ok>best)localStorage.setItem('ronpa-dojo-best',s.ok)}catch(e){}
+  sheet(`道場 結果：${s.ok}名 正解`,`<p>判定 ${s.n}名／正答率 ${s.n?Math.round(s.ok/s.n*100):0}%　${s.ok>best?'<b style="color:var(--weak)">自己ベスト更新</b>':`自己ベスト ${Math.max(best,s.ok)}名`}</p>
+    ${s.miss.length?`<div class="res">${s.miss.slice(-6).map(m=>`<div>${m}</div>`).join('')}</div>`:''}`,
+    [['もう一度',dojo],['タイトルへ',()=>{reset();G.i=0;render()}]]);
+}
+
+/* ---- Final result (story) ---- */
+function result(){
+  setTimeout(()=>sfx('rank'),200);
+  G.chapter=7;hud();
+  const sc=G.sim||{dead:0,under:0,pts:0,rank:'-'};
+  const pts=G.miss+sc.pts;const rank=pts<=1?'S':pts<=4?'A':pts<=8?'B':'C';
+  const rc=[['C','指揮：最先着隊長が宣言し、役割を割り振る'],['S','安全：Self→Scene→Survivor。救助者を傷病者にしない'],['C','情報伝達：METHANEで第一報。危険と最大人数を伝える'],['A','評価：救護所は風上・安全・動線のよい場所'],['T','トリアージ：到着時だけでなく、繰り返し再評価する'],['T','治療：限られた人と資器材を、救える人に集中させる'],['T','搬送：赤は三次へ。受入枠と救急車を計算して分散させる']];
+  stage.innerHTML=`<div class="result"><span class="note">活動終了　総合評価</span><span class="rank">${rank}</span>
+   <div class="stats"><div><b>${G.miss}</b>判断・議論ミス</div><div><b>${sc.dead}</b>防ぎえた死</div><div><b>${sc.under*2}分</b>赤の見逃し</div></div>
+   ${G.over.length?`<div class="lbl">見落とした危険・情報とその影響</div><ul class="msgs">${G.over.map(o=>`<li class="bad">${o}</li>`).join('')}</ul>`:''}
+   <div class="recap">${rc.map(r=>`<div><b>${r[0]}</b><span>${r[1]}</span></div>`).join('')}</div>
+   <div class="btns"><button class="primary" id="again" type="button">もう一度出場する</button><button class="ghost" id="so" type="button">救護所シミュレーションだけ遊ぶ</button><button class="ghost" id="tt" type="button">シナリオ選択へ</button></div>
+   <span class="note">教育用の架空シナリオです。基準や運用は各地域のプロトコルとMCLS標準テキストで確認してください。</span></div>`;
+  $('#again').onclick=()=>{reset();G.i=1;render()};$('#so').onclick=()=>{G.chapter=4;hud();simReady(true,G.sc)};$('#tt').onclick=()=>{reset();G.i=0;render()};
+}
+/* ===================== 追加シナリオ ===================== */
+Object.assign(CH,{
+  safe:{n:'安全担当',r:'工場の安全管理者',k:'工',c:'#9fb36b',img:{n:'img/safe_n.webp'}},
+  trk:{n:'トラック運転手',r:'関係者',k:'ト',c:'#c9a27e',img:{n:'img/trk_n.webp'}},
+  bosai:{n:'防災センター',r:'施設の担当者',k:'防',c:'#d98c5f',img:{n:'img/bosai_n.webp'}},
+  cond:{n:'車掌',r:'鉄道事業者',k:'車',c:'#7fa3c9',img:{n:'img/cond_n.webp'}}
+});
+Object.assign(EV,{
+  c_dispatch:['出場指令','化学工場で薬品漏えい、作業員多数負傷。風は北西の風。'],
+  c_zone:['ゾーニング','ホットゾーン（汚染区域・防護隊のみ）／ウォームゾーン（除染区域）／コールドゾーン（安全区域・救護）'],
+  c_gas:['黄緑色のもや','タンク付近から黄緑色のもや。目と喉を刺す強い刺激臭（塩素の疑い）。'],
+  c_wind:['吹き流し','風は北西から南東へ。正門と荷さばき場は風下側。'],
+  c_label:['タンクの表示','双眼鏡で確認：次亜塩素酸ナトリウムの受入配管が、酸のタンク側につながっている。混ざると塩素ガスが出る。'],
+  c_victim:['倒れている作業員','もやの中、タンク脇に作業員が2名倒れている。'],
+  c_pit:['荷さばき場のピット','一段低い荷さばき場。ガスは空気より重く、低い場所にたまる。'],
+  c_crowd:['正門前の避難者','十数人が正門前に集まり、咳き込んでいる。正門は風下。'],
+  c_count:['安全担当の証言：人数','「作業していたのは15人。正門に逃げたのが11人、まだ中に4人」'],
+  c_ongoing:['安全担当の証言：漏えい','「緊急遮断弁は閉めたが、ピットに液がたまっていて、まだガスが出ている」'],
+  c_sds:['SDS（安全データシート）','目・皮膚・呼吸器に強い刺激。皮膚や目に付いたら大量の水で洗い流す。'],
+  h_dispatch:['出場指令','高速道路下り線で多重衝突、車両多数。霧が濃い。'],
+  h_rear:['後方の車列','霧で視界は約50m。渋滞の最後尾に、後続車が速度を落とさずに近づいてくる。'],
+  h_ev:['電気自動車','EVの床下から白煙とパチパチという音。オレンジ色の高電圧ケーブルが見える。'],
+  h_haz:['大型トラック','荷台に「危」の標識。ドラム缶から液体が路面に漏れている。'],
+  h_rubber:['上り線','上り線の車が事故を見ようと減速している。横断は危ない。'],
+  h_evac:['路肩の避難者','十数人がガードレールの外に避難している。'],
+  h_fog:['霧','濃い霧。後続車から事故現場が見えない。'],
+  h_yellow:['イエローカード','引火性液体（塗料用溶剤）。火気厳禁、蒸気を吸わない。'],
+  h_cars:['トラック運転手の証言：台数','「前に5台、後ろにもう1台ぶつかった音がした。7台くらい」'],
+  h_child:['トラック運転手の証言：乗員','「前のワゴン車に、お腹の大きい女の人と子どもが乗っていた」'],
+  f_dispatch:['出場指令','ショッピングセンター3階から出火、黒煙。避難者多数、負傷者あり。'],
+  f_smoke:['黒煙の流れ','黒煙は南西の風で北東へ流れ、東側駐車場の上にかかっている。'],
+  f_crowd:['東側駐車場の避難者','数百人が東側駐車場に避難。煙の下で咳き込む人がいる。'],
+  f_exit:['正面入口','煙とともに避難者が出てくる。出入口は避難経路。'],
+  f_fall:['ガラスの落下','3階の窓ガラスが熱で割れ、建物の周りに落ちている。'],
+  f_gas:['ガス設備','建物西側にフードコート用のガス設備。消防隊がガスの遮断を確認中。'],
+  f_center:['防災センター','1階の防災センター。館内放送、残留者の情報、防火設備の作動状況がわかる。'],
+  f_space:['消防活動スペース','正面広場ははしご車の部署位置。ここに救急車を止めると消防活動の妨げになる。'],
+  f_left:['防災センターの情報：残留者','「3階トイレに2人、5階事務所に従業員1人が残っていると内線があった」'],
+  f_people:['防災センターの情報：人数','「夕方で館内は約800人。避難は放送で始めた」'],
+  f_panic:['防災センターの情報：転倒','「エスカレーター付近で、避難の人が将棋倒しになったと警備員から報告があった」'],
+  t_dispatch:['出場指令','普通列車が脱線、車両が横転。乗客多数が負傷の模様。'],
+  t_wire:['架線','架線（電車線）が切れて1両目の近くに垂れ下がっている。'],
+  t_track:['隣の線路','複線。隣の線路を走る列車が止まっているか、まだ確認できていない。'],
+  t_walk:['線路を歩く乗客','降りた乗客が線路の上を駅の方へ歩いている。'],
+  t_bank:['盛土','線路は高さ約3mの盛土の上。斜面は砕石で足場が悪い。'],
+  t_crowd:['踏切の人だかり','踏切に見物人と車が集まり、道路がふさがりかけている。'],
+  t_pax:['車掌の証言：乗客数','「4両で、乗客は120人くらいです」'],
+  t_power:['車掌の証言：電気','「運転指令に送電を止めるよう頼みましたが、停止の確認はまだです」'],
+  t_trapped:['車掌の証言：閉じ込め','「1両目で、座席と車体の間に挟まれている人が何人かいます」'],
+  t_opp:['車掌の証言：対向列車','「隣の線路の列車は止めると指令が言っていました。確認の連絡はまだです」']
+});
+
+/* ---------- 地図 ---------- */
+const PAPER='<rect width="600" height="400" fill="#f4f1e6"/>';
+const NORTH=`<g transform="translate(575,52)"><path d="M0,14 L0,-10" stroke="#3b3a33" stroke-width="2" marker-end="url(#ar)"/>${'<text x="-4" y="28" font-weight="700">N</text>'}</g>`;
+const SCALE=(m)=>`<g transform="translate(470,392)"><path d="M0,0 h60" stroke="#3b3a33" stroke-width="3"/><text x="20" y="-5" font-size="10">${m}</text></g>`;
+const LOT=(x,y,w,h,step=14)=>{let s=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e2dccb" stroke="#b9ae8f"/>`;for(let i=x+step;i<x+w;i+=step)s+=`<line x1="${i}" y1="${y+4}" x2="${i}" y2="${y+h/2-4}" stroke="#c7bfa8"/>`;return s};
+const DOTS=(cx,cy,n=14)=>{let s='';for(let i=0;i<n;i++)s+=`<circle cx="${cx+((i*37)%40)-20}" cy="${cy+((i*23)%24)-12}" r="2.4" fill="#3b3a33"/>`;return s};
+function chemArt(){return`${PAPER}
+ <rect x="0" y="0" width="600" height="26" fill="#a39d8c"/>${T(260,18,'市道','fill="#fff" font-weight="700"')}
+ <rect x="0" y="26" width="42" height="374" fill="#a39d8c"/>${T(8,250,'市道','fill="#fff" font-weight="700"')}
+ <rect x="110" y="40" width="475" height="345" fill="#ebe5d3" stroke="#6a6656" stroke-width="2" stroke-dasharray="8 4"/>
+ <rect x="42" y="140" width="72" height="22" fill="#a39d8c"/><rect x="105" y="136" width="12" height="30" fill="#ebe5d3"/>${T(118,178,'北西通用門','font-size="10"')}
+ <rect x="578" y="318" width="22" height="26" fill="#a39d8c"/>${T(548,312,'正門','font-size="10" font-weight="700"')}
+ <rect x="140" y="52" width="100" height="44" fill="#d3ccb5" stroke="#8d8778"/>${T(160,79,'事務所棟','font-weight="700"')}
+ ${LOT(130,172,110,58)}${T(140,244,'従業員駐車場','font-size="10"')}
+ <rect x="128" y="256" width="112" height="70" rx="6" fill="#cfe0bf" stroke="#9cb487"/>${T(160,340,'芝生広場','font-size="10"')}
+ <circle cx="350" cy="212" r="112" fill="#f0a640" fill-opacity=".07" stroke="#d98a1c" stroke-width="2" stroke-dasharray="7 5"/>${T(300,96,'ウォームゾーン','fill="#b06c0a" font-size="10" font-weight="700"')}
+ <circle cx="350" cy="212" r="62" fill="#e3343a" fill-opacity=".09" stroke="#e3343a" stroke-width="2" stroke-dasharray="6 4"/>${T(318,146,'ホットゾーン','fill="#b8282d" font-size="10" font-weight="700"')}
+ <ellipse cx="430" cy="276" rx="118" ry="38" transform="rotate(32 430 276)" fill="#c6d63e" opacity=".33"/>
+ <circle cx="332" cy="206" r="22" fill="#dcdcdc" stroke="#6a6656" stroke-width="2"/><circle cx="374" cy="224" r="17" fill="#dcdcdc" stroke="#6a6656" stroke-width="2"/>${T(318,250,'薬品タンク','font-size="10" font-weight="700"')}
+ <rect x="470" y="324" width="95" height="50" fill="#c9c2ad" stroke="#8d8778" stroke-dasharray="4 3"/>${T(474,386,'荷さばき場（一段低い）','font-size="10"')}
+ ${DOTS(548,296)}
+ <rect x="418" y="100" width="26" height="14" fill="#d9a441" stroke="#6a6656"/>
+ <line x1="482" y1="60" x2="482" y2="90" stroke="#3b3a33" stroke-width="2"/><path d="M482,60 L506,70 L482,76 Z" fill="#e3343a"/>
+ ${NORTH}`}
+function hwyArt(){let q='';for(let x=40;x<230;x+=30){q+=`<rect x="${x}" y="203" width="20" height="10" rx="2" fill="#cfcac0" stroke="#6a6656"/><rect x="${x+8}" y="231" width="20" height="10" rx="2" fill="#cfcac0" stroke="#6a6656"/>`}
+ return`${PAPER}
+ <rect x="0" y="0" width="600" height="122" fill="#d6e2cc"/><rect x="0" y="282" width="600" height="118" fill="#d6e2cc"/>
+ <rect x="0" y="128" width="600" height="56" fill="#8d8778"/><line x1="0" y1="156" x2="600" y2="156" stroke="#f4f1e6" stroke-width="2" stroke-dasharray="12 10"/>
+ <rect x="0" y="184" width="600" height="12" fill="#b9ae8f"/>
+ <rect x="0" y="196" width="600" height="58" fill="#8d8778"/><line x1="0" y1="225" x2="600" y2="225" stroke="#f4f1e6" stroke-width="2" stroke-dasharray="12 10"/>
+ <rect x="0" y="254" width="600" height="18" fill="#b2ac9b"/><line x1="0" y1="275" x2="600" y2="275" stroke="#6a6656" stroke-width="2" stroke-dasharray="2 4"/>
+ <rect x="0" y="122" width="600" height="6" fill="#b2ac9b"/>
+ ${T(8,148,'← 上り線','fill="#fff" font-size="10"')}${T(8,246,'下り線 →','fill="#fff" font-size="10"')}
+ ${q}${T(70,196,'渋滞の車列','font-size="10"')}
+ <g transform="rotate(20 292 212)"><rect x="280" y="206" width="24" height="12" rx="2" fill="#e8e5dc" stroke="#3b3a33"/></g>
+ <g transform="rotate(-25 345 214)"><rect x="333" y="208" width="24" height="12" rx="2" fill="#e8e5dc" stroke="#3b3a33"/></g>
+ <g transform="rotate(10 300 246)"><rect x="288" y="240" width="24" height="12" rx="2" fill="#bcd4e8" stroke="#3b3a33"/></g>${T(268,268,'EV','font-size="10" font-weight="700"')}
+ <g transform="rotate(-8 345 240)"><rect x="330" y="234" width="30" height="13" rx="2" fill="#e8e5dc" stroke="#3b3a33"/></g>
+ <rect x="378" y="198" width="54" height="22" rx="2" fill="#f0efe8" stroke="#3b3a33" stroke-width="2"/><rect x="420" y="203" width="10" height="10" fill="#e3343a"/>${T(380,194,'大型トラック','font-size="10" font-weight="700"')}
+ <path d="M462,272 h80 v12 h-80 z" fill="#b2ac9b"/>${T(468,296,'非常駐車帯','font-size="10"')}
+ <path d="M500,254 C510,280 520,300 530,312" stroke="#8d8778" stroke-width="12" fill="none"/>
+ ${LOT(468,312,128,80)}${T(474,397,'パーキングエリア（300m先）','font-size="10" font-weight="700"')}
+ <rect x="20" y="310" width="140" height="75" rx="6" fill="#c3d8a8" stroke="#8aa36d"/>${T(32,378,'運動公園（ICの外）','font-size="10"')}
+ <rect x="0" y="0" width="600" height="400" fill="#ffffff" opacity=".28"/>${T(250,40,'霧（視界 約50m）','font-size="13" fill="#6a6656" font-weight="700"')}
+ ${NORTH}`}
+function fireArt(){return`${PAPER}
+ <rect x="0" y="362" width="600" height="30" fill="#a39d8c"/>${T(270,382,'前面道路','fill="#fff" font-weight="700"')}
+ <rect x="20" y="30" width="130" height="85" rx="8" fill="#cfe0bf" stroke="#9cb487"/>${T(66,108,'公園','font-size="10"')}
+ ${LOT(20,128,155,115)}${T(40,140,'西側駐車場','font-size="10" font-weight="700"')}
+ <rect x="20" y="255" width="130" height="92" fill="#cdc6b0" stroke="#8d8778"/>${T(26,268,'立体駐車場（1階は屋根付き）','font-size="9"')}
+ <rect x="200" y="50" width="220" height="150" fill="#cfc8b2" stroke="#6a6656" stroke-width="2"/>${T(222,160,'ショッピングセンター（5階建て）','font-weight="700"')}
+ <path d="M318,98 c6,-14 14,-10 12,-24 c10,10 12,18 6,28 z" fill="#e3343a"/>${T(270,118,'3階フードコート（出火）','font-size="10" fill="#b8282d"')}
+ <ellipse cx="470" cy="62" rx="140" ry="34" transform="rotate(-18 470 62)" fill="#4a4a4a" opacity=".28"/>
+ <rect x="288" y="196" width="40" height="8" fill="#f4f1e6"/>${T(330,214,'正面入口','font-size="10"')}
+ <rect x="200" y="200" width="220" height="150" fill="#ece6d4"/>${T(300,300,'正面広場','font-size="10" fill="#6a6656"')}
+ <rect x="420" y="70" width="30" height="30" fill="#bdb6a0" stroke="#8d8778"/>${T(452,110,'搬入口','font-size="10"')}
+ ${LOT(440,120,150,225)}${T(486,135,'東側駐車場','font-size="10" font-weight="700"')}${DOTS(515,270,22)}
+ <rect x="226" y="172" width="34" height="22" fill="#e9e2cc" stroke="#8d8778"/>${T(214,188,'防災センター','font-size="9"')}
+ <g transform="translate(500,26)"><path d="M0,16 L26,0" stroke="#3b3a33" stroke-width="3" marker-end="url(#ar)"/>${'<text x="-30" y="34" font-size="10">風向き（南西→北東）</text>'}</g>
+ ${NORTH}${SCALE('50m')}`}
+function trainArt(){let ties='',poles='',houses='';for(let x=0;x<600;x+=14)ties+=`<line x1="${x}" y1="134" x2="${x}" y2="148" stroke="#8d8778"/><line x1="${x}" y1="164" x2="${x}" y2="178" stroke="#8d8778"/>`;
+ for(let x=40;x<600;x+=90)poles+=`<rect x="${x}" y="116" width="5" height="10" fill="#3b3a33"/>`;
+ for(let x=10;x<600;x+=46)houses+=`<rect x="${x}" y="${20+((x*7)%30)}" width="30" height="24" fill="#ddd3b7" stroke="#b9ae8f"/>`;
+ return`${PAPER}
+ ${houses}${T(470,96,'住宅地','font-size="10"')}
+ <rect x="0" y="104" width="600" height="100" fill="#d9cfb2"/><rect x="0" y="104" width="600" height="14" fill="url(#hatch)" opacity=".6"/><rect x="0" y="190" width="600" height="14" fill="url(#hatch)" opacity=".6"/>
+ ${ties}<line x1="0" y1="138" x2="600" y2="138" stroke="#5a554a" stroke-width="2"/><line x1="0" y1="144" x2="600" y2="144" stroke="#5a554a" stroke-width="2"/>
+ <line x1="0" y1="168" x2="600" y2="168" stroke="#5a554a" stroke-width="2"/><line x1="0" y1="174" x2="600" y2="174" stroke="#5a554a" stroke-width="2"/>
+ ${poles}<path d="M0,124 L230,124 C260,126 280,150 292,166 M320,124 L600,124" stroke="#3b3a33" stroke-width="1.5" fill="none"/>
+ ${T(520,132,'上り線（隣の線路）','font-size="9"')}${T(520,190,'下り線','font-size="9"')}
+ <g transform="rotate(18 262 166)"><rect x="228" y="154" width="70" height="24" rx="3" fill="#ececec" stroke="#3b3a33" stroke-width="2"/></g>${T(226,212,'1両目（横転）','font-size="10" font-weight="700"')}
+ <g transform="rotate(-16 345 168)"><rect x="312" y="158" width="66" height="20" rx="3" fill="#ececec" stroke="#3b3a33" stroke-width="2"/></g>
+ <rect x="392" y="161" width="66" height="18" rx="3" fill="#ececec" stroke="#3b3a33"/><rect x="464" y="161" width="66" height="18" rx="3" fill="#ececec" stroke="#3b3a33"/>
+ <rect x="185" y="0" width="28" height="248" fill="#a39d8c" opacity=".9"/>${T(150,100,'踏切','font-size="10" font-weight="700"')}
+ <rect x="0" y="222" width="600" height="24" fill="#a39d8c"/>${T(500,239,'市道','fill="#fff" font-weight="700"')}
+ <rect x="88" y="255" width="85" height="55" fill="#e7e0cb" stroke="#b9ae8f"/>${T(96,322,'空き地','font-size="10"')}
+ ${LOT(10,318,135,74)}${T(14,312,'工場の大型駐車場','font-size="10"')}
+ <rect x="378" y="272" width="94" height="66" fill="#d3ccb5" stroke="#8d8778"/>${T(392,352,'小学校 体育館','font-size="10"')}
+ <rect x="480" y="262" width="112" height="128" rx="6" fill="#d8cfae" stroke="#b9ae8f"/>${T(512,382,'校庭','font-size="10"')}
+ ${NORTH}${SCALE('50m')}`}
+Object.assign(MAPS,{
+ chem:{art:chemArt,flow:'M310,190 L272,164 M248,170 L226,188 M210,222 L176,266 M150,272 L72,170',flowNote:'ホットゾーン → 除染所 → トリアージ → 救護所 → 救急車（風上の北西へ）',
+  slots:{A:{x:548,y:332,n:'正門前',d:'風下。避難者が集まっている。',bad:'風下でガスが流れてくる。避難者が集まっていて、ここで活動すると汚染が広がる。'},
+   B:{x:300,y:252,n:'タンクの横',d:'ホットゾーンの中。',bad:'ホットゾーンの中。防護服の隊員しか入れない。'},
+   C:{x:515,y:350,n:'荷さばき場',d:'一段低い場所。風下。',bad:'一段低くガスがたまる。しかも風下。'},
+   D:{x:256,y:150,n:'通用門の内側',d:'ウォームゾーンとコールドゾーンの境目。風上側。'},
+   E:{x:190,y:116,n:'事務所棟の前',d:'風上で一段高い。構内全体が見渡せる。'},
+   F:{x:212,y:202,n:'駐車場の東側',d:'コールドゾーン。通用門から近い。'},
+   H:{x:160,y:290,n:'芝生広場',d:'コールドゾーンの奥。広くて平ら。'},
+   G:{x:66,y:186,n:'通用門外の市道',d:'構外。車両が並べられる。'},
+   I:{x:452,y:106,n:'フォークリフト置き場',d:'ゾーンの外だが、タンクの北東。',bad:'風向きが少し変わればガスがかかる。進入路からも遠い。'}},
+  facs:{cmd:{n:'現場指揮本部',k:'指',c:'#3c3a96',best:'E',ok:{F:'安全だが、構内全体は見通しにくい。'},why:'風上で一段高い事務所棟の前からは、タンク・各ゾーン・除染所がすべて見える。'},
+   decon:{n:'除染所',k:'除',c:'#1f7a8c',best:'D',ok:{},bad:{F:'コールドゾーンの中で除染すると、汚染をきれいな区域に持ち込む。',H:'救護所の奥で除染すると、汚染が救護所に広がる。'},why:'ウォームゾーンとコールドゾーンの境目の風上側。ホットゾーンから出た人は必ずここを通ってから、きれいな区域に入る。'},
+   tri:{n:'トリアージポスト',k:'T',c:'#e3343a',best:'F',ok:{H:'使えるが、除染所から少し離れる。'},why:'除染所を出てすぐのコールドゾーン。除染を終えた人から順に区分する。'},
+   aid:{n:'救護所',k:'救',c:'#2fae63',best:'H',ok:{F:'トリアージポストと重なり狭くなる。'},why:'コールドゾーンの奥の広い芝生。風上で、救急車を通用門から呼び込める。'},
+   stg:{n:'救急車の待機場所',k:'車',c:'#c27a1a',best:'G',ok:{},bad:{F:'構内の駐車場に救急車を入れると、除染前の人と動線が交わる。'},why:'構外の市道。通用門から呼ばれた順に入り、構内に車両をためない。'}}},
+ hwy:{art:hwyArt,flow:'M372,226 L428,258 M458,268 L498,280 M528,296 L540,316 M530,340 L508,346',flowNote:'事故現場 → 前方のトリアージ → PAの救護所 → 救急車（下流へ一方向）',
+  slots:{I:{x:52,y:232,n:'最後尾のさらに後ろ',d:'渋滞の最後尾よりさらに後方。'},
+   B:{x:165,y:232,n:'渋滞の中',d:'車列の中ほど。',bad:'渋滞の中は後続車から見えず、追突の危険がある。'},
+   A:{x:335,y:226,n:'事故車両の間',d:'EVと危険物のそば。',bad:'事故車両の間。EVと危険物のそばで、救出の妨げにもなる。'},
+   C:{x:330,y:132,n:'上り線の路肩',d:'対向車線。',bad:'対向車線。見物で減速した車が通り、横断も危ない。'},
+   D:{x:440,y:262,n:'前方の路肩',d:'事故車両の前方。後続車が来ない側。'},
+   E:{x:518,y:280,n:'非常駐車帯',d:'路肩より広い非常駐車帯。'},
+   F:{x:548,y:338,n:'パーキングエリア',d:'300m先のPA。広い。'},
+   G:{x:488,y:350,n:'PAの入口側',d:'車両を並べやすい。'},
+   H:{x:90,y:345,n:'運動公園',d:'高速道路の外。広く平ら。'}},
+  facs:{rear:{n:'後方警戒',k:'警',c:'#5a6b7a',best:'I',ok:{},bad:{B:'渋滞の中では後続車から見えず、警戒にならない。'},why:'渋滞の最後尾よりさらに手前で、後続車に早めに知らせる。霧の日はさらに距離をとる。'},
+   cmd:{n:'現場指揮本部',k:'指',c:'#3c3a96',best:'E',ok:{D:'トリアージポストと重なると、指揮が個々の対応に巻き込まれやすい。'},why:'事故車両の前方の非常駐車帯は、車線をふさがず、現場と救護所の両方に近い。'},
+   tri:{n:'トリアージポスト',k:'T',c:'#e3343a',best:'D',ok:{E:'使えるが、救出した人を運ぶ距離が延びる。'},why:'事故車両の前方（下流側）の路肩。後続車が来ない側で、救出した人を運び出しやすい。'},
+   aid:{n:'救護所',k:'救',c:'#2fae63',best:'F',ok:{},why:'前方のパーキングエリア。広くて安全で、救急車が出入りしやすい。'},
+   stg:{n:'救急車の待機場所',k:'車',c:'#c27a1a',best:'G',ok:{E:'本線上に救急車をためると、搬送のたびに出入りが重なる。'},why:'PAの入口側。呼ばれた順に救護所へ横付けし、そのまま次のICへ出られる。'},
+   heli:{n:'臨時ヘリ離着陸場',k:'H',c:'#6b4fa0',best:'H',ok:{F:'PAへの着陸もできるが、救護所の真横で吹き下ろしの影響を受ける。'},why:'高速道路の外の広い運動公園。電線がなく、車線を止め続けなくてよい。'}}},
+ fire:{art:fireArt,flow:'M300,212 L214,230 M174,244 L104,284 M88,322 L106,356 M98,92 L178,216',flowNote:'建物 → トリアージ → 救護所 → 救急車。避難者は公園に集め、症状のある人をトリアージへ',
+  slots:{A:{x:310,y:224,n:'正面入口前',d:'避難者が出てくる場所。建物のすぐそば。',bad:'落下物の危険があり、避難経路と消防活動の妨げになる。'},
+   B:{x:515,y:232,n:'東側駐車場',d:'風下。煙がかかっている。',bad:'風下で煙がかかる。'},
+   C:{x:452,y:86,n:'北東の搬入口',d:'建物の裏。風下。',bad:'風下で、消防車両の進入路でもある。'},
+   D:{x:192,y:232,n:'西側駐車場の建物寄り',d:'建物から少し離れた風上。避難者が流れてくる。'},
+   E:{x:96,y:186,n:'西側駐車場の中央',d:'風上。建物全体が見える。'},
+   F:{x:85,y:300,n:'立体駐車場1階',d:'屋根があり広い。'},
+   G:{x:120,y:377,n:'前面道路の西側',d:'車両を並べやすい。'},
+   H:{x:85,y:70,n:'公園',d:'風上の広い公園。'},
+   I:{x:330,y:282,n:'正面広場',d:'建物の正面。広い。',bad:'はしご車の部署位置。救急の拠点を置くと消防活動の妨げになる。'}},
+  facs:{cmd:{n:'現場指揮本部',k:'指',c:'#3c3a96',best:'E',ok:{D:'トリアージポストと重なると、指揮が個々の対応に巻き込まれやすい。'},why:'風上で、建物全体・駐車場・救護所が見渡せる。'},
+   tri:{n:'トリアージポスト',k:'T',c:'#e3343a',best:'D',ok:{E:'使えるが、建物から出てきた人を運ぶ距離が延びる。'},why:'建物から少し離れた風上。避難者の流れの出口で区分できる。'},
+   aid:{n:'救護所',k:'救',c:'#2fae63',best:'F',ok:{E:'屋根がなく、夜間や雨に弱い。'},why:'屋根があり広い立体駐車場の1階。トリアージポストに近く、前面道路から救急車を呼び込める。'},
+   stg:{n:'救急車の待機場所',k:'車',c:'#c27a1a',best:'G',ok:{},why:'前面道路の西側。消防車両の動線から外れ、救護所へすぐ入れる。'},
+   crowd:{n:'避難者の集合場所',k:'避',c:'#2d7d9a',best:'H',ok:{E:'駐車場では車の出入りと交わり、人数を把握しにくい。'},why:'風上の公園に避難者を集め、名簿を作る。咳や頭痛のある人はトリアージポストへ送る。'}}},
+ train:{art:trainArt,flow:'M262,190 L238,216 M252,242 L402,300 M98,350 L400,318',flowNote:'車両 → 踏切のトリアージ → 体育館の救護所。救急車は駐車場から呼ぶ',
+  slots:{A:{x:330,y:140,n:'線路上',d:'脱線車両の横。',bad:'架線と隣の線路の列車。き電停止と列車防護の確認前は入れない。'},
+   B:{x:300,y:198,n:'盛土の斜面',d:'砕石の斜面。',bad:'砕石の斜面で足場が悪く、担架が滑る。'},
+   C:{x:300,y:62,n:'住宅地の路地',d:'線路の北側。',bad:'狭く救急車が入れない。線路を越えないと行けない。'},
+   D:{x:234,y:258,n:'踏切近くの道路',d:'盛土の下。踏切から線路の外へ出られる。'},
+   E:{x:130,y:280,n:'踏切脇の空き地',d:'現場が見通せる。'},
+   F:{x:425,y:305,n:'小学校の体育館',d:'屋根があり広い。'},
+   G:{x:76,y:356,n:'工場の大型駐車場',d:'大型車も止められる。'},
+   H:{x:535,y:330,n:'小学校の校庭',d:'広く平らで、電線がない。'}},
+  facs:{cmd:{n:'現場指揮本部',k:'指',c:'#3c3a96',best:'E',ok:{D:'トリアージポストと重なると、指揮が個々の対応に巻き込まれやすい。'},why:'踏切脇の空き地からは、盛土の上の車両と踏切、道路が見通せる。'},
+   tri:{n:'トリアージポスト',k:'T',c:'#e3343a',best:'D',ok:{E:'使えるが、運び出す距離が延びる。'},why:'盛土の下の踏切付近。車両から運び出した人がまず通る場所。'},
+   aid:{n:'救護所',k:'救',c:'#2fae63',best:'F',ok:{E:'屋根がなく、多数の傷病者を収容できない。'},why:'屋根があり広い体育館。多数の傷病者を収容でき、道路から救急車を横付けできる。'},
+   stg:{n:'救急車の待機場所',k:'車',c:'#c27a1a',best:'G',ok:{},why:'大型の駐車場に救急車をためて、呼ばれた順に体育館へ送る。踏切の周りを車両でふさがない。'},
+   heli:{n:'臨時ヘリ離着陸場',k:'H',c:'#6b4fa0',best:'H',ok:{},why:'広く平らで、電線がない校庭。救護所の体育館にも近い。'}}}
+});
+
+/* ---------- 現場調査 ---------- */
+Object.assign(EXP,{
+ chem:{img:'img/scene_chem.webp',alt:'化学工場の構内',title:'構内の状況評価',checks:5,intro:'写真の気になる場所をタップして調べる（双眼鏡で確認する）。',
+  spots:[{id:'office',b:[0,30,20,50],n:'事務所棟',t:'事務所の窓から従業員がこちらを見ている。風上側で、異常はなさそうだ。'},
+   {id:'sock',b:[13,1,11,14],n:'吹き流し',ev:'c_wind',hz:1,t:'吹き流しは風下へまっすぐなびいている。もやは右手前の荷さばき場へ流れ、正門側にも回り込みそうだ。'},
+   {id:'crowd',b:[19,27,14,11],n:'正門前',ev:'c_crowd',hz:1,t:'作業員が正門前に集まって咳き込んでいる。風向きが変われば、もやがかかる位置だ。'},
+   {id:'fork',b:[29,43,10,13],n:'フォークリフト',t:'荷役用のフォークリフト。今は関係なさそうだ。'},
+   {id:'label',b:[46,16,13,26],n:'タンクの表示',ev:'c_label',hz:1,t:'双眼鏡で見ると、次亜塩素酸ナトリウムの受入配管が、酸のタンク側につながっている。'},
+   {id:'cloud',b:[59,26,20,22],n:'タンク付近のもや',ev:'c_gas',hz:1,t:'黄緑色のもやが漂い、離れていても目と喉が痛む。'},
+   {id:'victim',b:[51,45,15,9],n:'タンクの脇',ev:'c_victim',t:'もやの中に作業員が2名倒れている。動きは見えない。'},
+   {id:'pit',b:[62,61,38,36],n:'荷さばき場',ev:'c_pit',hz:1,t:'一段低い荷さばき場に、もやが濃くたまっている。'}]},
+ hwy:{img:'img/scene_hwy.webp',alt:'霧の高速道路の多重衝突',title:'事故現場の状況評価',checks:5,intro:'写真の気になる場所をタップして調べる。霧で見通しが悪く。',
+  spots:[{id:'evac',b:[0,32,24,28],n:'ガードレールの外',ev:'h_evac',t:'十数人がガードレールの外の斜面に避難している。車に戻ろうとしている人もいる。'},
+   {id:'tail',b:[38,4,29,32],n:'後方の車列',ev:'h_rear',hz:1,t:'霧の奥まで渋滞が続く。最後尾に、後続車が速度を落とさずに近づいてくる音がする。'},
+   {id:'rubber',b:[68,4,32,38],n:'上り線',ev:'h_rubber',hz:1,t:'上り線の車が事故を見ようとして減速している。中央分離帯を越えて横断するのは危ない。'},
+   {id:'car3',b:[23,40,25,18],n:'黒い車とワゴン車',t:'運転席で人がぐったりしている。救出は消防隊が行う。'},
+   {id:'truck',b:[53,32,35,34],n:'大型トラック',ev:'h_haz',hz:1,t:'荷台に危険物の標識。積荷のドラム缶が崩れかけている。'},
+   {id:'spill',b:[68,66,24,14],n:'路面の液体',ev:'h_haz',hz:1,alias:'truck',t:'ドラム缶から液体が路面に広がり、溶剤の臭いがする。'},
+   {id:'ev',b:[37,50,22,24],n:'電気自動車',ev:'h_ev',hz:1,t:'EVの床下から白煙。パチパチと音がして、オレンジ色の高電圧ケーブルが見えている。'}]},
+ fire:{img:'img/scene_fire.webp',alt:'ショッピングセンターの火災',title:'火災現場の状況評価',checks:5,intro:'写真の気になる場所をタップして調べる。',
+  spots:[{id:'gas',b:[5,20,12,30],n:'建物の西面',ev:'f_gas',hz:1,t:'壁沿いにフードコート用のガス設備がある。消防隊がガスの遮断を確認している。'},
+   {id:'center',b:[22,44,18,18],n:'1階の西側',ev:'f_center',t:'1階に防災センターがある。館内放送が流れ、残留者の情報が集まっているはずだ。'},
+   {id:'smoke',b:[44,0,40,30],n:'黒煙',ev:'f_smoke',hz:1,t:'黒煙は風下の右手へ流れ、駐車場の上にかかり始めている。'},
+   {id:'fall',b:[28,22,38,22],n:'3階の窓',ev:'f_fall',hz:1,t:'3階の窓ガラスが熱で割れ、建物の下に落ちてくる。'},
+   {id:'exit',b:[43,46,20,14],n:'正面入口',ev:'f_exit',t:'煙とともに次々と人が出てくる。ここは避難経路だ。'},
+   {id:'space',b:[42,61,26,15],n:'正面広場',ev:'f_space',hz:1,t:'はしご車が部署している。消防隊が「ここに車両を入れるな」と叫んでいる。'},
+   {id:'crowd',b:[70,38,30,30],n:'右手の駐車場',ev:'f_crowd',hz:1,t:'数百人が避難している。風下で、煙の下で咳き込んでいる人もいる。'}]},
+ train:{img:'img/scene_train.webp',alt:'脱線した列車',title:'脱線現場の状況評価',checks:5,intro:'写真の気になる場所をタップして調べる。',
+  spots:[{id:'house',b:[40,17,30,14],n:'住宅地',t:'線路沿いの住宅。住民が窓からこちらを見ている。'},
+   {id:'wire',b:[1,3,28,50],n:'架線と電柱',ev:'t_wire',hz:1,t:'電柱が傾き、切れた架線が1両目の近くまで垂れ下がっている。送電が止まったかはわからない。'},
+   {id:'walk',b:[76,31,24,13],n:'線路上の人',ev:'t_walk',hz:1,t:'降りた乗客が、線路の上を奥へ歩いていく。'},
+   {id:'bank',b:[28,63,55,18],n:'盛土の斜面',ev:'t_bank',hz:1,t:'盛土は高さ約3m。斜面は砕石で、足を取られそうだ。'},
+   {id:'opp',b:[0,54,70,9],n:'手前の線路',ev:'t_track',hz:1,t:'複線で、手前にもう1本の線路がある。この線路の列車が止まっているかは、まだ確認できていない。'},
+   {id:'car1',b:[15,36,24,20],n:'1両目',t:'窓越しに、座席の間で動けない人が見える。救出は消防隊が行う。'},
+   {id:'cross',b:[0,72,46,28],n:'見物人',ev:'t_crowd',hz:1,t:'見物人と車が集まり、近くの踏切と道路がふさがりかけている。'}]}
+});
+
+/* ---------- 指揮ミーティング ---------- */
+Object.assign(DB,{
+ c_d1:{title:'倒れた作業員をどう救うか',bullets:['c_dispatch','c_zone','c_gas','c_wind','c_label','c_victim','c_pit','c_crowd','ev_3s'],
+  st:[{w:'sak',t:'倒れている作業員が[2名]見えます！'},
+   {w:'sak',t:'息を止めて走れば、[防護なしでも救出できます]'},
+   {w:'sak',t:'救急車は[正門前の避難者のところ]に回します'},
+   {w:'sak',t:'においがきつければ、[低い所に身をかがめて]進めばいい'},
+   {w:'sak',t:'物質が何かは[あとで調べれば]いいですよね'}],
+  wk:{a:{fb:'その人数は確かめたとおり。争点じゃありません'},
+   b:{ans:['c_gas','ev_3s'],fb:'ガスの中に防護なしで入れば、救助者が傷病者になる。ホットゾーンからの救出は、化学防護服と空気呼吸器を着けた隊が行う。救急隊はコールドゾーンで受け入れの準備をする。',miss:'佐倉がホットゾーンへ走り出しかけ、消防隊長に引き戻された。入っていれば、救助者が傷病者になっていた。'},
+   c:{ans:['c_wind','c_crowd'],fb:'正門は風下でガスが流れてくる。救急車は風上の北西通用門側に置き、避難者も風上へ誘導する。',miss:'救急車が正門前に入り、ガスが流れてきて車両ごと退避することになった。'},
+   d:{ans:['c_pit'],fb:'塩素は空気より重く、低い所にたまる。かがむほど濃いガスを吸う。',miss:'低い場所に入った隊員が咳き込み、交代が必要になった。'},
+   e:{ans:['c_label'],fb:'物質がわかれば、防護のレベル、除染の方法、病院での治療が決まる。表示やイエローカード、SDSで早く特定し、指令と病院に伝える。',miss:'物質名の連絡が遅れ、病院の受け入れ準備が後手に回った。'}}},
+ c_d2:{title:'指令センターへの第一報（METHANE）',bullets:['ev_methane','c_gas','c_label','c_ongoing','c_count','c_crowd','c_wind','c_sds'],
+  st:[{w:'oni',t:'M：化学災害を伴う[多数傷病者事故]を宣言'},
+   {w:'oni',t:'E：沿岸工業団地、化学工場の構内'},
+   {w:'oni',t:'T：薬品の漏えいによる有毒ガスの発生'},
+   {w:'oni',t:'H：危険要因は[刺激臭のみ。収まりつつある]'},
+   {w:'oni',t:'A：進入は風上の北西通用門から'},
+   {w:'oni',t:'N：傷病者は[倒れている4名]'},
+   {w:'oni',t:'E：応援は[救急隊2隊]を要請'}],
+  wk:{a:{fb:'化学災害を伴う多数傷病者事故。宣言は正しい'},
+   b:{ans:['c_gas','c_label','c_ongoing'],fb:'塩素ガスの疑いと、まだ発生が続いていることを伝える。後着隊の防護と、病院の準備が変わる。',miss:'後着隊が物質を知らずに到着し、防護の準備をやり直した。'},
+   c:{ans:['c_count','c_crowd'],fb:'作業員15人全員が曝露した可能性がある。正門に逃げた11人も傷病者として数える。',miss:'軽症者の数が報告から漏れ、救急隊と病院の手配が不足した。'},
+   d:{ans:['c_count','c_ongoing'],fb:'15人規模で、ガスの発生も続いている。化学機動中隊（除染）、救急隊の増隊、DMATを要請する。',miss:'応援の要請が遅れ、除染と搬送が追いつかなかった。'}}},
+ h_d1:{title:'高速道路上でどう動くか',bullets:['h_dispatch','h_rear','h_ev','h_haz','h_rubber','h_evac','h_fog','ev_3s'],
+  st:[{w:'sak',t:'事故には[7台ほど]が関係しているようです'},
+   {w:'sak',t:'[車線をふさいで、すぐに救護]を始めます！'},
+   {w:'sak',t:'白い煙はエアバッグのガスです。[EVも普通の車と同じ]に救出します'},
+   {w:'sak',t:'トラックの[積荷はあとで確認]します'},
+   {w:'sak',t:'路肩の人たちには[車の中に戻って待つ]よう言いました'}],
+  wk:{a:{fb:'台数はおおむね合っています。争点じゃありません'},
+   b:{ans:['h_rear','h_fog'],fb:'霧で後続車から現場が見えない。消防車両を後方に斜めに止めて盾にし、発炎筒と矢印板で後方警戒。通行止めは高速隊と道路管理者に要請する。',miss:'活動中に後続車が渋滞の最後尾に追突し、新たな傷病者が出た。'},
+   c:{ans:['h_ev'],fb:'EVの高電圧バッテリーが損傷している。オレンジ色のケーブルに触れず、メーカーの救助手順で電源を遮断する。再発火に備えて警戒筒先を。',miss:'救助中にEVのバッテリーから再び発火し、救出が中断した。'},
+   d:{ans:['h_haz'],fb:'「危」の標識は危険物の目印。イエローカードで物質を確かめ、漏れた液体に近づかない、火気を使わない。',miss:'漏れた溶剤の蒸気で、近くの隊員が気分不良を訴えた。'},
+   e:{ans:['h_rear','h_evac'],fb:'車内は追突されると危ない。ガードレールの外の安全な場所で待ってもらう。',miss:'車内に戻った人の車に後続車が接触し、けが人が増えた。'}}},
+ h_d2:{title:'指令センターへの第一報（METHANE）',bullets:['ev_methane','h_ev','h_haz','h_yellow','h_rear','h_fog','h_cars','h_child'],
+  st:[{w:'oni',t:'M：多重衝突事故、[多数傷病者事故]を宣言'},
+   {w:'oni',t:'E：高速道路下り線、インターチェンジの手前'},
+   {w:'oni',t:'T：霧による多重衝突'},
+   {w:'oni',t:'H：危険要因は[特になし]'},
+   {w:'oni',t:'A：進入は[後方から車列の横をすり抜けて]'},
+   {w:'oni',t:'N：傷病者は[5名程度]'},
+   {w:'oni',t:'E：救急隊3隊と救助隊を要請。[小児・妊婦の情報は不要]'}],
+  wk:{a:{fb:'宣言は正しい'},
+   b:{ans:['h_ev','h_haz','h_yellow','h_rear'],fb:'EVの高電圧と再発火、危険物（引火性液体）の漏えい、後続車の追突。後着隊の安全に直結する。',miss:'後着隊が危険物の存在を知らずにトラックのそばに部署した。'},
+   c:{ans:['h_rear','h_fog'],fb:'通行止めが済むまで、霧の車列の横を進入するのは二次事故の危険。高速隊と調整し、通行止めの後に進入する。',miss:'霧の車列の横を進入した救急車が、急停止した車に接触しかけた。'},
+   d:{ans:['h_cars'],fb:'7台規模なら、10名を超える前提で報告する。',miss:'傷病者数を少なく報告し、救急隊の追加要請が遅れた。'},
+   e:{ans:['h_child'],fb:'妊婦と子どもがいる。周産期・小児に対応できる医療機関の調整が早いほど、搬送先が決まりやすい。',miss:'妊婦と子どもの受け入れ先の調整が遅れ、搬送先がなかなか決まらなかった。'}}},
+ f_d1:{title:'救護の拠点をどこにするか',bullets:['f_dispatch','f_smoke','f_crowd','f_exit','f_fall','f_gas','f_center','f_space','ev_3s'],
+  st:[{w:'sak',t:'煙は[3階から上]に広がっています'},
+   {w:'sak',t:'傷病者は[正面入口のすぐ前]で手当てします！'},
+   {w:'sak',t:'救急車は[東側駐車場]に集めます'},
+   {w:'sak',t:'救急車を[正面の広いスペース]に止めます'},
+   {w:'sak',t:'避難した人は[けががなければ帰ってもらって]いいですよね'}],
+  wk:{a:{fb:'延焼の範囲は消防隊が把握しています。争点じゃありません'},
+   b:{ans:['f_fall','f_exit'],fb:'窓ガラスが落ちてくるうえ、避難経路をふさぐ。建物から離れた風上で活動する。',miss:'正面入口前でガラスが落下し、隊員の近くで砕けた。'},
+   c:{ans:['f_smoke','f_crowd'],fb:'東側は風下で煙の下。救急車は風上の西側に置く。',miss:'救急車が煙に包まれ、移動し直すことになった。'},
+   d:{ans:['f_space'],fb:'正面広場ははしご車の部署位置。救急車を止めると消防活動の妨げになる。',miss:'救急車がはしご車の進入をふさぎ、救助が遅れた。'},
+   e:{ans:['f_crowd','f_center'],fb:'煙を吸った人は、一酸化炭素中毒でも元気に見えることがある。集合場所を決めて人数を把握し、症状を確かめる。',miss:'帰宅した人の中から、夜になってCO中毒で搬送される人が出た。'}}},
+ f_d2:{title:'指令センターへの第一報（METHANE）',bullets:['ev_methane','f_fall','f_gas','f_space','f_people','f_crowd','f_panic','f_left'],
+  st:[{w:'oni',t:'M：商業施設火災、[多数傷病者事故]を宣言'},
+   {w:'oni',t:'E：駅前のショッピングセンター'},
+   {w:'oni',t:'T：3階フードコートからの火災、黒煙が上階へ'},
+   {w:'oni',t:'H：危険要因は[煙のみ]'},
+   {w:'oni',t:'A：進入は前面道路の西側から'},
+   {w:'oni',t:'N：傷病者は[煙を吸った3名]'},
+   {w:'oni',t:'E：救急隊3隊を要請。[逃げ遅れの情報は消防隊だけで共有]'}],
+  wk:{a:{fb:'宣言は正しい'},
+   b:{ans:['f_fall','f_gas','f_space'],fb:'ガラスの落下、ガス設備、はしご車の部署位置。後着隊の部署位置と安全に関わる。',miss:'後着の救急隊が正面広場に止めてしまった。'},
+   c:{ans:['f_people','f_crowd','f_panic'],fb:'館内は約800人。将棋倒しの報告もある。目の前の数ではなく、見込みで多めに伝える。',miss:'傷病者数を少なく報告し、救急隊の追加要請が遅れた。'},
+   d:{ans:['f_left'],fb:'残留者の情報は救助と救護の両方に関わる。指令を通じて全隊に共有し、救出後の受け入れを準備する。',miss:'救出された残留者の受け入れ準備が遅れた。'}}},
+ t_d1:{title:'脱線車両にどう近づくか',bullets:['t_dispatch','t_wire','t_track','t_walk','t_bank','t_crowd','ev_3s'],
+  st:[{w:'sak',t:'1両目には[閉じ込められた人]がいます！'},
+   {w:'sak',t:'[車体によじ登って]、窓から入ります'},
+   {w:'sak',t:'隣の線路は[たぶん止まってる]から、線路上に担架を並べます'},
+   {w:'sak',t:'降りた乗客には[線路沿いに歩いて駅まで]行ってもらいます'},
+   {w:'sak',t:'担架は[盛土の斜面をまっすぐ下ろせば]早い'}],
+  wk:{a:{fb:'閉じ込めは事実です。争点じゃありません'},
+   b:{ans:['t_wire'],fb:'切れた架線に電気が流れているおそれがある。き電停止（送電停止）の確認がとれるまで、車体と架線に近づかない。',miss:'佐倉が車体に手をかけかけ、消防隊長に止められた。架線はまだ送電中だった。'},
+   c:{ans:['t_track'],fb:'列車防護（隣の線路の列車を止めること）の確認がとれるまで、線路上で活動しない。鉄道事業者と確認する。',miss:'線路上に置いた担架のすぐ横を、減速した列車が通過した。'},
+   d:{ans:['t_walk','t_track'],fb:'線路上は危険。踏切や通路から線路の外へ誘導し、集合場所で人数を把握する。',miss:'線路を歩いた乗客が砕石で転び、けが人が増えた。'},
+   e:{ans:['t_bank'],fb:'砕石の斜面で担架を下ろすと転倒の危険。ロープやはしご、踏切側の通路を使う。',miss:'斜面で担架の隊員が足を滑らせ、傷病者を落としかけた。'}}},
+ t_d2:{title:'指令センターへの第一報（METHANE）',bullets:['ev_methane','t_wire','t_power','t_track','t_opp','t_pax','t_trapped','t_walk'],
+  st:[{w:'oni',t:'M：列車脱線、[多数傷病者事故]を宣言'},
+   {w:'oni',t:'E：郊外の路線、駅から約1kmの踏切付近'},
+   {w:'oni',t:'T：4両編成の脱線、1両目横転'},
+   {w:'oni',t:'H：危険要因は[特になし。電車は止まっている]'},
+   {w:'oni',t:'A：進入は踏切側の市道から'},
+   {w:'oni',t:'N：傷病者は[30名程度]'},
+   {w:'oni',t:'E：救急隊5隊を要請。[救助隊は1隊で足りる]'}],
+  wk:{a:{fb:'宣言は正しい'},
+   b:{ans:['t_wire','t_power','t_track','t_opp'],fb:'架線の送電と隣の線路の列車は、停止の確認がまだ。後着隊の安全のために必ず伝える。',miss:'後着隊が架線の状況を知らずに車両へ近づこうとした。'},
+   c:{ans:['t_pax'],fb:'乗客は約120人。歩ける人も含めて、多めに報告する。',miss:'傷病者数を少なく報告し、医療機関の受け入れ調整が遅れた。'},
+   d:{ans:['t_trapped'],fb:'複数の挟まれがあり、救出は長時間になる。救助隊の増隊と、救出前輸液のための医師の派遣を要請する。',miss:'救助隊の不足で救出が長引いた。'}}}
+});
+
+/* 弱点の自動採番：[語句] → [語句|a]（登場順に a,b,c…） */
+Object.values(DB).forEach(d=>{let n=0;d.st.forEach(x=>{x.t=x.t.replace(/\[([^|\]]+)\]/g,(m,w)=>`[${w}|${'abcdefgh'[n++]}]`);
+  if(/\|\w\]/.test(x.t))n=Math.max(n,...[...x.t.matchAll(/\|(\w)\]/g)].map(q=>'abcdefgh'.indexOf(q[1])+1))})});
+/* ---------- 聞き取り ---------- */
+Object.assign(IVW,{
+ chem:{who:'safe',max:4,intro:'安全担当者は口元を押さえ、目を赤くしている。',
+  qs:[{q:'何の薬品が漏れたんですか？',a:'次亜塩素酸ナトリウムの受け入れ中に、配管を酸のタンクにつないでしまって……塩素ガスだと思います。',ev:'c_label'},
+   {q:'何人いましたか？',a:'作業していたのは15人。正門に逃げたのが11人、まだ中に4人います。',ev:'c_count'},
+   {q:'漏れは止まりましたか？',a:'緊急遮断弁は閉めました。でもピットに液がたまっていて、まだガスが出ています。',ev:'c_ongoing'},
+   {q:'SDS（安全データシート）はありますか？',a:'事務所にあります。今、持ってこさせます。',ev:'c_sds'},
+   {q:'自衛消防隊は何をしましたか？',a:'避難の誘導だけです。中には誰も入っていません。'},
+   {q:'あなたは大丈夫ですか？',a:'少し目が痛いだけです。風上の事務所にいたので。'}]},
+ hwy:{who:'trk',max:4,intro:'トラックの運転手は胸を押さえている。',
+  qs:[{q:'積荷は何ですか？',a:'塗料用の溶剤のドラム缶です。イエローカードは運転席にあります。',ev:'h_yellow'},
+   {q:'何台が巻き込まれましたか？',a:'前に5台、後ろにもう1台ぶつかった音がしました。7台くらいだと思います。',ev:'h_cars'},
+   {q:'前の車には誰が乗っていましたか？',a:'前のワゴン車に、お腹の大きい女の人と子どもが乗っていました。',ev:'h_child'},
+   {q:'あなたのけがは？',a:'胸をハンドルで打ちました。歩けるけど、息をすると痛い。'},
+   {q:'何があったんですか？',a:'霧で前が見えなくて……前の車が急に止まったんです。'},
+   {q:'上り線はどうでしたか？',a:'向こうもみんな速度を落として、こっちを見ていました。'}]},
+ fire:{who:'bosai',max:4,intro:'防災センターの担当者は館内図を握りしめている。',
+  qs:[{q:'逃げ遅れている人はいますか？',a:'3階のトイレに2人、5階の事務所に従業員が1人残っていると内線がありました。',ev:'f_left'},
+   {q:'館内に何人いましたか？',a:'夕方なので約800人です。避難は放送で始めました。',ev:'f_people'},
+   {q:'けが人の情報はありますか？',a:'エスカレーターの近くで、避難の人が将棋倒しになったと警備員から報告がありました。',ev:'f_panic'},
+   {q:'スプリンクラーは作動しましたか？',a:'作動しました。ただ、煙が多くて……。'},
+   {q:'出火場所はどこですか？',a:'3階フードコートの厨房です。'},
+   {q:'防火戸は閉まっていますか？',a:'3階は閉まったと表示されています。'}]},
+ train:{who:'cond',max:4,intro:'車掌は腕を押さえながら、無線で運転指令とやり取りしている。',
+  qs:[{q:'乗客は何人いましたか？',a:'4両で、120人くらいです。',ev:'t_pax'},
+   {q:'電気は止まっていますか？',a:'運転指令に送電を止めるよう頼みました。停止の確認はまだです。',ev:'t_power'},
+   {q:'閉じ込められている人はいますか？',a:'1両目で、座席と車体の間に挟まれている人が何人かいます。',ev:'t_trapped'},
+   {q:'隣の線路の列車は？',a:'止めると指令が言っていました。確認の連絡はまだです。',ev:'t_opp'},
+   {q:'何があったんですか？',a:'カーブに入ったところで大きく揺れて……。'},
+   {q:'あなたのけがは？',a:'腕を打っただけです。'}]}
+});
+
+/* ---------- 救護所シミュレーション ---------- */
+const STAFF5=[['田所',1],['森',1],['佐倉',0],['大西',0],['林',0]];
+const ITEMS0={o2:3,bvm:2,iv:2,pel:1,meter:1};
+const AMB=(t,n,a,b,c)=>({t,veh:n,crew:[[a,1],[b,0],[c,0]]});
+const V12=[{id:'v1',n:'救急1',crew:0,cap:2},{id:'v2',n:'救急2',crew:0,cap:2}];
+function chemPatients(){const C={contam:1};return [
+ mkP({id:'A',ag:'男 34',arr:2,hp:55,base:1,contam:1,needs:{contam:3,o2:4,airway:4},look:'救助隊に担がれて出てきた。ぐったりしている',find:['ホットゾーン内で倒れていた','喘鳴、口から泡','衣服がぬれて刺激臭'],good:{jcs:10,rr:30,hr:112,sbp:140,spo2:90},bad:{spo2:55},
+  tip:'ホットゾーンからの傷病者は、除染より先に気道と呼吸。気道確保と酸素を続けながら除染する。'}),
+ mkP({id:'B',ag:'男 52',arr:3,hp:70,base:.5,contam:1,needs:{contam:3,o2:4},look:'咳き込みながら救助隊に支えられて出てきた',find:['強い咳と呼吸困難','衣服に刺激臭'],good:{rr:30,hr:104,sbp:150,spo2:90},bad:{spo2:60},
+  tip:'酸素を続けながら除染。脱衣だけでも汚染の大部分を減らせる。'}),
+ mkP({id:'C',ag:'女 41',arr:4,hp:80,base:1,contam:1,needs:{contam:6},anat:['化学損傷（体表の約20%）'],look:'腕と胸に液体を浴び、皮膚が赤くただれている',find:['腕から胸に化学損傷','痛みで叫んでいる'],good:{rr:24,hr:110,sbp:130,spo2:96},
+  tip:'液体の化学物質は時間とともに損傷が深くなる。大量の水での除染が最優先の治療。'}),
+ mkP({id:'D',ag:'男 26',arr:6,hp:0,cpa:true,black0:true,contam:1,look:'救助隊が荷さばき場のピットから救出。動かない',find:['ガスのたまった低い場所で倒れていた','気道確保後も呼吸なし'],
+  tip:'ガスは低い場所にたまる。防護のない救出は二次被害を生む。'}),
+ mkP({id:'E',ag:'男 45',arr:0,hp:100,walk:true,contam:1,needs:{contam:1},look:'正門付近。目をこすり咳をしている',find:['目の痛み、咳','衣服に刺激臭'],good:{rr:20,hr:90},
+  tip:'歩ける人は誘導して自力で脱衣・除染。人手を重症者に回す。'}),
+ mkP({id:'F',ag:'女 29',arr:0,hp:100,walk:true,contam:1,needs:{contam:1},look:'正門付近。のどを押さえている',find:['咳、のどの痛み','衣服に刺激臭'],tip:'歩ける汚染者は、自力除染の誘導でまとめて対応できる。'}),
+ mkP({id:'G',ag:'男 58',arr:0,hp:95,walk:true,contam:1,needs:{contam:1},look:'正門付近。ゼーゼーと息をしている',find:['咳','喘息の持病がある（吸入薬を持っている）'],good:{rr:24,hr:96,spo2:95},
+  tip:'持病のある人は軽症に見えても悪化しやすい。喘息は刺激性ガスで発作を起こす。早めの酸素と再評価を。'}),
+ mkP({id:'H',ag:'男 33',arr:0,hp:100,walk:true,contam:1,needs:{contam:1},look:'正門付近。軽く咳をしている',find:['軽い咳','ガスの近くで数分作業していた'],
+  tip:'刺激性ガスは数時間後に肺水腫を起こすことがある。軽症でも経過観察と受診が必要。'}),
+ mkP({id:'I',ag:'女 50',arr:0,hp:100,walk:true,look:'事務所から避難してきた。手がしびれると言う',find:['手足のしびれ、息が速い（過換気）','ガスの近くにはいなかった'],good:{rr:26,hr:100},tip:'汚染のない人を除染ラインに並ばせない。聞き取りで曝露の有無を確かめる。'}),
+ mkP({id:'J',ag:'男 61',arr:1,hp:95,base:.2,contam:1,needs:{contam:1},look:'座り込んで足首を押さえている',find:['逃げる途中で転倒し足首を痛めた','衣服に刺激臭'],good:{rr:20,hr:92,sbp:150},tip:'歩けない汚染者は担架で除染する。2人がかりになるので段取りが要る。'}),
+ mkP({id:'K',ag:'男 22',arr:0,hp:100,walk:true,contam:1,needs:{contam:1},look:'正門付近。目が赤い',find:['目の刺激感','衣服に刺激臭'],tip:'緑。自力除染の誘導でよい。'}),
+ mkP({id:'L',ag:'女 36',arr:1,hp:100,walk:true,contam:1,needs:{contam:2},look:'目を押さえて歩いてきた',find:['顔に液体の飛沫がかかった','目が開けられない'],tip:'目に入った化学物質は、すぐに大量の水で洗い続ける。'})
+]}
+function hwyPatients(){return [
+ mkP({id:'A',ag:'男 48',arr:0,hp:75,base:.8,trapped:1,rescueT:10,needsR:{bleed:6},anatR:['右下腿開放骨折、拍動性出血'],look:'乗用車の運転席に挟まれている（救出中）',find:['運転席で両脚が挟まれている','右下腿から出血'],good:{rr:24,hr:108,sbp:120,spo2:96},
+  tip:'救出直後に止血が必要になる。救出の見込み時間に合わせて人と資器材を準備しておく。'}),
+ mkP({id:'B',ag:'女 31',arr:1,hp:90,base:.2,needs:{supine:3},pref:'syu',prefWhy:'妊婦は周産期医療に対応できる施設へ',look:'車の横で仰向けに寝かされている。おなかが大きい',find:['妊娠32週','仰向けで気分不良、冷や汗'],good:{rr:22,hr:100,sbp:118,spo2:97},
+  tip:'妊娠後期は仰向けで子宮が大静脈を圧迫し、血圧が下がる（仰臥位低血圧症候群）。左側臥位に。搬送先は周産期センター。'}),
+ mkP({id:'C',ag:'男 6',arr:1,hp:85,base:.5,needs:{shock:4},pref:'syu',prefWhy:'小児は小児の重症外傷に対応できる施設へ',look:'後部座席から救出された男の子。泣いている',find:['腹部にシートベルトの痕','Bさんの子ども'],good:{rr:24,hr:105,sbp:100,spo2:98},bad:{hr:170,sbp:50},
+  tip:'小児は血圧が最後まで保たれ、急に崩れる。頻脈と腹部のシートベルト痕が手がかり。'}),
+ mkP({id:'D',ag:'男 40',arr:0,hp:80,base:.5,needs:{spine:3},anat:['四肢麻痺（頸髄損傷の疑い）'],look:'ワゴン車の運転席。首の痛みを訴え、手足が動かない',find:['両手足が動かない','脈が遅く、血圧が低め'],good:{rr:20,hr:56,sbp:96,spo2:95},bad:{hr:40,sbp:50},
+  tip:'四肢麻痺は解剖学的に赤。全脊柱固定で悪化を防ぐ。脈が遅く血圧が低いのは神経原性ショックの可能性。'}),
+ mkP({id:'E',ag:'男 66',arr:1,hp:95,base:.2,walk:true,look:'頭を押さえて歩いている',find:['頭を打った','血液をサラサラにする薬を飲んでいる'],good:{rr:18,hr:80,sbp:150},bad:{rr:8,hr:50,sbp:190,spo2:80},
+  tip:'抗凝固薬を飲んでいる人の頭部外傷は、時間差で悪化しやすい。軽症でも経過観察と早めの受診を。'}),
+ mkP({id:'F',ag:'女 24',arr:0,hp:100,walk:true,look:'ガードレールの外に避難している',find:['額の擦り傷'],tip:'緑。'}),
+ mkP({id:'G',ag:'男 35',arr:2,hp:62,base:1,needs:{chest:6,o2:2},anat:['外頸静脈の怒張、片側の呼吸音の減弱'],look:'救出されたが、苦しそうに肩で息をしている',find:['左胸の痛み','首の静脈が膨らんでいる'],good:{rr:28,hr:110,sbp:120,spo2:93},bad:{spo2:60},
+  tip:'緊張性気胸は放置すると急速に悪化する。医師による胸腔の減圧（胸腔ドレナージ）が鍵。'}),
+ mkP({id:'H',ag:'男 55',arr:0,hp:96,needs:{shock:1.4},walk:true,look:'トラックの運転手。胸を押さえている',find:['胸をハンドルで打った','歩ける'],good:{rr:20,hr:88,sbp:140},
+  tip:'聞き取りで「胸を打った」と言っていた。歩ける人も再評価を。'}),
+ mkP({id:'I',ag:'女 44',arr:0,hp:100,walk:true,look:'EVを運転していた女性',find:['手首の痛み'],tip:'緑。'}),
+ mkP({id:'J',ag:'男 72',arr:1,hp:0,cpa:true,black0:true,look:'車外に投げ出されていた。動かない',find:['車外に投げ出されていた','気道確保後も呼吸なし'],tip:'MCIでは気道確保しても呼吸がなければ黒。'}),
+ mkP({id:'K',ag:'女 19',arr:2,hp:78,base:1,needs:{pelvis:4},anat:['骨盤骨折の疑い'],look:'軽自動車の助手席。腰の痛みで動けない',find:['恥骨部の痛みと皮下血腫'],
+  tip:'骨盤骨折は解剖学的に赤。骨盤固定具（1つしかない）をGさん・Kさんのどちらに使うかではなく、必要な人に確実に。'})
+]}
+function firePatients(){return [
+ mkP({id:'A',ag:'男 70',arr:1,hp:72,base:.3,needs:{co:4},look:'煙の中から避難してきた。ぼんやりしている',find:['頭痛と吐き気','SpO2は98%と正常に見える','顔色はよい'],good:{jcs:20,rr:22,hr:100,sbp:140,spo2:98},bad:{spo2:97,jcs:300},
+  tip:'パルスオキシメータは一酸化炭素と酸素を区別できず、CO中毒でも正常値を示す。意識障害と頭痛があれば高濃度酸素を。'}),
+ mkP({id:'B',ag:'女 35',arr:2,hp:85,base:.5,anat:['顔面熱傷、口の中のすす（気道熱傷の疑い）'],pref:'burn',prefWhy:'熱傷・気道熱傷は熱傷センターへ',look:'顔にやけど。声がかすれている',find:['顔面熱傷','声のかすれ（嗄声）','口の中にすす'],good:{rr:24,hr:104,sbp:128,spo2:95},
+  tip:'気道熱傷は時間とともに腫れて気道がふさがる。医師がいるうちに早めの気管挿管を。'}),
+ mkP({id:'C',ag:'男 45',arr:2,hp:85,base:.5,anat:['熱傷（体表の約30%）'],pref:'burn',prefWhy:'広範囲熱傷は熱傷センターへ',look:'両腕と胸にやけど',find:['両腕と胸の熱傷'],good:{rr:24,hr:110,sbp:130},
+  tip:'広範囲熱傷は時間をかけてショックになる。輸液の準備と熱傷センターへの搬送を。'}),
+ mkP({id:'D',ag:'女 80',arr:1,hp:75,base:.5,needs:{o2:3},look:'咳が止まらない',find:['咳、すすのついた痰','高齢'],good:{rr:30,hr:96,sbp:150,spo2:91},bad:{spo2:70},tip:'煙を吸った高齢者は悪化しやすい。酸素と早めの搬送を。'}),
+ mkP({id:'E',ag:'男 12',arr:0,hp:100,walk:true,look:'一人で立っている男の子',find:['保護者とはぐれた','けがはない'],tip:'子どもは保護者と合流するまで記録して保護する。緑でも置き去りにしない。'}),
+ mkP({id:'F',ag:'女 28',arr:0,hp:100,walk:true,look:'腕を押さえて歩いてきた',find:['避難の混雑で転倒、前腕の変形'],tip:'緑。副子固定で十分。'}),
+ mkP({id:'G',ag:'男 55',arr:1,hp:70,base:1,needs:{o2:3,chest:3},anat:['胸郭動揺'],look:'将棋倒しの下敷きになっていた',find:['胸の痛み、呼吸に合わせて胸の一部が逆に動く'],good:{rr:30,hr:110,sbp:130,spo2:92},bad:{spo2:62},
+  tip:'将棋倒しでは胸部圧迫の重症者が出る。胸郭動揺は解剖学的に赤。'}),
+ mkP({id:'H',ag:'女 40',arr:0,hp:100,walk:true,look:'手がしびれて震えている',find:['手のしびれ、不安が強い'],good:{rr:26},tip:'過換気でも、煙を吸っていないかは確かめる。'}),
+ mkP({id:'I',ag:'男 33',arr:0,hp:100,walk:true,look:'すすで顔が黒い男性',find:['消火器で初期消火をした','軽い咳'],tip:'初期消火をした人は煙を吸っている。緑でも経過観察を。'}),
+ mkP({id:'J',ag:'女 67',arr:4,hp:0,cpa:true,black0:true,look:'消防隊が3階から救出した',find:['3階トイレから救出','気道確保後も呼吸なし'],tip:'MCIでは気道確保しても呼吸がなければ黒。'}),
+ mkP({id:'K',ag:'男 60',arr:1,hp:80,base:.5,needs:{mi:3},anat:['胸痛と冷汗（急性冠症候群の疑い）'],pref:'ken',prefWhy:'胸痛（急性冠症候群）は心臓カテーテル治療ができる施設へ',look:'避難の途中で胸を押さえてしゃがみ込んだ',find:['締めつけられるような胸痛','冷や汗','けがはない'],good:{rr:22,hr:108,sbp:138},
+  tip:'多数傷病者の中にも、外傷以外の急病がいる。現場でできることは少なく、治療できる施設への早い搬送が鍵。'}),
+ mkP({id:'L',ag:'女 25',arr:0,hp:100,walk:true,look:'手を冷やしている',find:['右手のやけど（水ぶくれ）'],tip:'緑。冷却と被覆で十分。'})
+]}
+function trainPatients(){return [
+ mkP({id:'A',ag:'男 30',arr:0,hp:75,base:.5,trapped:1,rescueT:12,crush:1,anatR:['下肢の長時間圧迫'],look:'1両目で下半身を挟まれている（救出中）',find:['座席と車体の間に下半身を挟まれている','13時05分の事故から挟まれたまま'],good:{rr:22,hr:100,sbp:120,spo2:96},
+  tip:'挟まれが長いほどクラッシュ症候群の危険が高い。救出前の輸液を、救出の時刻から逆算して準備する。'}),
+ mkP({id:'B',ag:'女 50',arr:0,hp:72,base:.5,trapped:1,rescueT:16,crush:1,anatR:['下肢の長時間圧迫'],look:'1両目で脚を挟まれている（救出中）',find:['両脚を挟まれている','Nくんの母親'],good:{rr:22,hr:104,sbp:118,spo2:96},
+  tip:'2人目の挟まれも救出前輸液が要る。輸液セットと救命士の配分を早めに決める。'}),
+ mkP({id:'C',ag:'男 70',arr:1,hp:78,base:1,needs:{pelvis:4},anat:['骨盤骨折の疑い'],look:'車内から運び出された。腰の痛みで動けない',find:['恥骨部の皮下血腫','下肢の外旋'],tip:'骨盤骨折は解剖学的に赤。骨盤固定具を最優先で。'}),
+ mkP({id:'D',ag:'女 22',arr:0,hp:62,base:1,needs:{bleed:8},anat:['右下腿の不全切断'],look:'右脚から大量に出血している',find:['右下腿の不全切断','拍動性の出血'],good:{rr:26,hr:118,sbp:110,spo2:96},
+  tip:'大量出血は最初の数分が勝負。止血（止血帯）を最優先。'}),
+ mkP({id:'E',ag:'男 45',arr:1,hp:60,base:1,needs:{airway:6},look:'仰向けで動かない。いびきのような音',find:['頭部の挫創','いびき様呼吸'],good:{jcs:30,rr:14,hr:96,sbp:136,spo2:95},bad:{rr:6,hr:40,sbp:60,spo2:55},tip:'舌根沈下。気道確保に1人を張り付け、医師が来たら挿管で人手を解放。'}),
+ mkP({id:'F',ag:'女 68',arr:1,hp:95,base:.2,look:'座席から転落し、脚の付け根を痛がっている',find:['右股関節の痛み、脚が短く見える（大腿骨頸部骨折の疑い）'],tip:'黄。副子固定で後回しにできる。'}),
+ mkP({id:'G',ag:'男 35',arr:2,hp:68,base:1,needs:{o2:3,chest:3},anat:['胸郭動揺'],look:'苦しそうに浅い呼吸をしている',find:['胸の一部が呼吸と逆に動く'],good:{rr:30,hr:110,sbp:128,spo2:92},bad:{spo2:62},tip:'胸郭動揺は解剖学的に赤。酸素と医師の処置で時間を稼ぐ。'}),
+ mkP({id:'H',ag:'女 40',arr:2,hp:86,base:1,needs:{shock:5},look:'座席にもたれている',find:['腹部の打撲','顔色がやや悪い'],good:{rr:22,hr:92,sbp:126,spo2:97},bad:{rr:36,hr:160,sbp:40},tip:'隠れたショック。到着時は黄でも、再評価で血圧と脈の変化を拾う。'}),
+ mkP({id:'I',ag:'男 80',arr:0,hp:0,cpa:true,black0:true,look:'車両の外に倒れている',find:['車外に投げ出されていた','気道確保後も呼吸なし'],tip:'MCIでは気道確保しても呼吸がなければ黒。'}),
+ mkP({id:'J',ag:'女 19',arr:0,hp:100,walk:true,look:'自分で降りてきた',find:['手の擦り傷'],tip:'緑。'}),
+ mkP({id:'K',ag:'男 25',arr:0,hp:100,walk:true,look:'肩を押さえている',find:['左肩の脱臼の疑い'],tip:'緑。'}),
+ mkP({id:'L',ag:'女 33',arr:0,hp:100,walk:true,look:'泣きながら歩いてきた',find:['膝の擦り傷'],tip:'緑。'}),
+ mkP({id:'M',ag:'男 58',arr:2,hp:70,needs:{glucose:4},bgl:42,look:'呼びかけに目を開けるが、話がかみ合わない',find:['外傷は軽い','財布に糖尿病の治療カード'],good:{jcs:20,rr:18,hr:90,sbp:146,spo2:96},
+  tip:'意識障害の原因は外傷とは限らない。血糖測定→指示→ブドウ糖で回復すれば黄に下げられる。'}),
+ mkP({id:'N',ag:'男 8',arr:0,hp:100,walk:true,look:'一人で泣いている男の子',find:['母親（Bさん）が車内に挟まれている','擦り傷のみ'],tip:'子どもを一人にしない。保護して記録し、母親と同じ搬送先にできるか調整する。'})
+]}
+const HOSP=(id,n,lv,cap,t,m)=>({id,n,lv,cap,t,m});
+const SIMS={
+ bus:{start:[16,0],maxT:20,pts:busPatients,hosp:BUS_HOSP,sched:BUS_SCHED,items:ITEMS0,staff:STAFF5,veh:V12,ev:busEvents,
+  hint:S=>{if(G.ev.has('ev_insulin')){const J=S.pts.find(p=>p.id==='J');J.look+='（運転手の話：インスリンを使っている年配の女性がいた）'}}},
+ chem:{start:[10,40],maxT:20,pts:chemPatients,items:ITEMS0,staff:STAFF5,veh:V12,
+  rules:['汚染された傷病者は、除染するまで気道確保・酸素以外の処置と搬送ができない','歩ける汚染者は、1人の誘導でまとめて自力除染できる'],
+  hosp:[HOSP('ken','県立救命救急センター',3,3,10,'三次・20分'),HOSP('dai','大学病院救命センター',3,3,14,'三次・28分'),HOSP('rosai','労災病院',2,4,8,'二次・16分'),HOSP('cli','近隣クリニック群',1,6,6,'緑の受入・12分')],
+  sched:[AMB(2,'救急3','小川','石田','上野'),{t:3,team:'化学機動中隊',crew:[['矢野',0],['内田',0],['平井',0]],note:'除染要員'},{t:5,doc:'真壁'},AMB(6,'救急4','村上','江口','岡'),{t:8,heli:1,dest:'ken',ft:4},AMB(9,'救急5','中川','堀','吉田'),{t:11,bus:1,cap:6},AMB(12,'救急6','今井','関','原'),AMB(15,'救急7','野口','菅','丸山')],
+  ev:(t,msgs)=>{const Gp=P('G'),H=P('H');
+   if(t===4&&Gp.loc==='scene'&&!Gp.o2){Gp.needs.o2=5;Gp.walk=false;Gp.hp=Math.min(Gp.hp,62);Gp.find.push('喘鳴が強くなり座り込んだ（喘息発作）');lg(Gp,'喘息発作');msgs.push({c:'bad',x:'緑エリアのGさんがゼーゼーと苦しそうにしている'})}
+   if(t===9&&H.loc==='scene'){H.needs.o2=5;H.base=1;H.walk=false;H.hp=Math.min(H.hp,58);H.find.push('息苦しさが急に強くなった（遅発性の肺水腫の疑い）');lg(H,'遅発性の呼吸困難');msgs.push({c:'bad',x:'緑エリアのHさんが「急に息が苦しくなった」と訴えている'})}}},
+ hwy:{start:[7,52],maxT:20,pts:hwyPatients,items:ITEMS0,staff:STAFF5,veh:V12,
+  rules:['妊婦と子どもは、周産期・小児に対応できる施設への搬送が望ましい','新しい処置：全脊柱固定（隊員2名）、左側臥位（隊員1名）'],
+  hosp:[HOSP('ken','県立救命救急センター',3,3,12,'三次・24分'),HOSP('syu','総合周産期母子医療センター',3,2,15,'三次・小児/産科・30分'),HOSP('shi','市民総合病院',2,4,8,'二次・16分'),HOSP('cli','近隣クリニック群',1,5,6,'緑の受入・12分')],
+  sched:[AMB(2,'救急3','小川','石田','上野'),{t:4,doc:'真壁'},AMB(5,'救急4','村上','江口','岡'),AMB(7,'救急5','中川','堀','吉田'),{t:8,heli:1,dest:'ken',ft:4},AMB(10,'救急6','今井','関','原'),{t:12,bus:1,cap:4},AMB(13,'救急7','野口','菅','丸山'),AMB(16,'救急8','森下','岩田','北村')],
+  ev:(t,msgs)=>{const E=P('E');if(t===7&&E.loc==='scene'&&!E.cpa){E.hp=Math.min(E.hp,48);E.needs.airway=6;E.base=1.5;E.walk=false;E.find.push('嘔吐し、反応が鈍くなった');lg(E,'意識レベル低下');
+    msgs.push({c:busyOn(E).length?'bad':'',x:busyOn(E).length?'Eさんが嘔吐し、反応が鈍くなった（付いている隊員より）':'緑エリアの方で、誰かが「吐いている人がいる」と叫んでいる'})}}},
+ fire:{start:[18,24],maxT:20,pts:firePatients,items:{...ITEMS0,iv:3},staff:STAFF5,veh:V12,
+  rules:['パルスオキシメータの値が正常でも、CO中毒は否定できない','救急隊の到着は多いが、熱傷センターの受入枠は少ない'],
+  hosp:[HOSP('ken','県立救命救急センター（心臓カテーテル可）',3,3,10,'三次・20分'),HOSP('burn','大学病院熱傷センター',3,2,14,'三次・熱傷・28分'),HOSP('shi','市民総合病院',2,4,6,'二次・12分'),HOSP('cli','近隣クリニック群',1,6,5,'緑の受入・10分')],
+  sched:[AMB(2,'救急3','小川','石田','上野'),AMB(3,'救急4','村上','江口','岡'),{t:4,doc:'真壁'},AMB(5,'救急5','中川','堀','吉田'),AMB(7,'救急6','今井','関','原'),AMB(9,'救急7','野口','菅','丸山'),{t:10,bus:1,cap:6},AMB(12,'救急8','森下','岩田','北村'),AMB(15,'救急9','松井','阿部','金子')],
+  ev:(t,msgs)=>{const B=P('B'),C=P('C');
+   if(t===5&&C.loc==='scene'&&!C.cpa){C.needs.shock=4;C.find.push('頻脈、冷汗（熱傷ショック）');lg(C,'熱傷ショック')}
+   if(t===7&&B.loc==='scene'&&!B.cpa&&!B.intub){B.needs.burnair=10;B.find.push('息を吸うときに高い音（ストライダー）');lg(B,'上気道の閉塞が進行');msgs.push({c:'bad',x:'Bさんの呼吸がヒューヒューと高い音になってきた'})}}},
+ train:{start:[13,40],maxT:22,pts:trainPatients,items:{...ITEMS0,iv:3},staff:STAFF5,veh:V12,
+  rules:['挟まれた2名は、救出前の輸液がないと救出直後に急変する','傷病者14名。軽症者が多いので、緑の扱いで人手を浪費しない'],
+  hosp:[HOSP('ken','県立救命救急センター',3,3,12,'三次・24分'),HOSP('dai','大学病院救命センター',3,3,16,'三次・32分'),HOSP('shi','市民総合病院',2,4,8,'二次・16分'),HOSP('cli','近隣クリニック群',1,6,6,'緑の受入・12分')],
+  sched:[AMB(1,'救急3','小川','石田','上野'),AMB(3,'救急4','村上','江口','岡'),{t:4,doc:'真壁'},AMB(6,'救急5','中川','堀','吉田'),{t:7,heli:1,dest:'dai',ft:5},{t:8,doc:'小野'},AMB(9,'救急6','今井','関','原'),{t:11,bus:1,cap:6},AMB(12,'救急7','野口','菅','丸山'),AMB(14,'救急8','森下','岩田','北村'),AMB(17,'救急9','松井','阿部','金子')]}
+};
+
+/* ---------- ストーリー ---------- */
+const STORY_CHEM=[
+ {t:'title'},
+ {t:'narr',x:'10時20分。沿岸工業団地の化学工場から119番。「薬品が漏れて、作業員が何人も倒れている。ひどい臭いだ」'},
+ {t:'say',w:'cmd',x:'救急1、出場せよ。工業団地の化学工場で薬品漏えい。作業員多数が負傷の模様。現在、北西の風。'},
+ {t:'say',w:'oni',e:'a',x:'化学災害ですね。近づき方を間違えると、こっちがやられます。'},
+ {t:'say',w:'sak',x:'倒れてる人がいるなら急がないと！'},
+ {t:'get',ids:['c_dispatch']},
+ {t:'chap',i:0,s:'化学災害では、近づき方から指揮が始まる',m:'判断'},
+ {t:'narr',x:'工場が見えてきた。正門の方角に、黄緑色のもやがうっすら見える。'},
+ {t:'choice',q:'現着時、最初にどうする？',o:[
+  {l:'正門から構内に入り、倒れている人のそばに停める',ok:0,fb:'正門は風下でガスが流れてくる。防護なしで近づけば救急隊も傷病者になる。'},
+  {l:'風上の北西側に離れて停車し、MCIと化学災害を宣言して情報を集める',ok:1,fb:'正解。化学災害は「風上から、離れて、高い所から」。指揮を宣言し、物質と範囲がわかるまで近づかない。'},
+  {l:'正門前で避難してきた人たちの手当てを始める',ok:0,fb:'そこは風下。避難者ごと風上へ誘導するのが先。'}]},
+ {t:'say',w:'oni',x:'北西の通用門側に停めます。'},
+ {t:'chap',i:1,s:'ゾーニング：ホット・ウォーム・コールド',m:'現場調査 → 指揮ミーティング'},
+ {t:'get',ids:['ev_3s','c_zone']},
+ {t:'narr',x:'風上の高台から、双眼鏡で構内の状況を確かめる。'},
+ {t:'explore',id:'chem'},
+ {t:'say',w:'sak',e:'a',x:'隊長！ 中に倒れてる人が見えます。今なら走って助けられます！'},
+ {t:'debate',id:'c_d1'},
+ {t:'say',w:'sakaki',x:'化学機動中隊が向かっている。ホットゾーンからの救出は防護服の隊員がやる。救急隊は除染後の傷病者を頼む。'},
+ {t:'say',w:'sak',e:'s',x:'……ガスの中に飛び込むところでした。'},
+ {t:'chap',i:2,s:'物質の特定と、正確な第一報',m:'聞き取り → 指揮ミーティング'},
+ {t:'narr',x:'工場の安全担当者が、口元を押さえながら駆け寄ってきた。'},
+ {t:'interview',id:'chem'},
+ {t:'get',ids:['ev_methane']},
+ {t:'say',w:'oni',e:'a',x:'第一報を読み上げます。確認をお願いします。'},
+ {t:'debate',id:'c_d2'},
+ {t:'say',w:'oni',e:'s',x:'物質と規模、訂正して送ります。'},
+ {t:'say',w:'cmd',x:'指令了解。塩素ガスの疑い、発生継続中。化学機動中隊、救急隊の増隊、DMATを出場させる。受入病院にも物質名を伝える。'},
+ {t:'chap',i:3,s:'除染所と救護所の配置',m:'配置マップ'},
+ {t:'say',w:'sakaki',x:'ゾーンを設定した。タンクを中心にホットゾーン、その外側がウォームゾーンだ。'},
+ {t:'mapplace',id:'chem'},
+ {t:'chap',i:4,s:'除染と救護を同時に回す',m:'救護所シミュレーション'},
+ {t:'say',w:'tad',x:'応援の田所です。除染が終わらないと、処置も搬送もできません。人手の配分が勝負ですね。'},
+ {t:'sim',id:'chem'},
+ {t:'say',w:'oni',x:'活動を、化学災害対応の指揮隊に引き継ぎます。'},
+ {t:'say',w:'you',x:'見えない危険から、隊員と傷病者を守る。それが今日の指揮だった。'},
+ {t:'result'}];
+const STORY_HWY=[
+ {t:'title'},
+ {t:'narr',x:'7時40分。濃い霧の朝。高速道路の下り線で、多重衝突の通報が相次いだ。'},
+ {t:'say',w:'cmd',x:'救急1、出場せよ。高速道路下り線、インターチェンジ手前で多重衝突。車両多数。霧が濃い、注意せよ。'},
+ {t:'say',w:'oni',e:'a',x:'この霧だと、後続車が怖いですね。'},
+ {t:'say',w:'sak',x:'何台巻き込まれてるんだろう……。'},
+ {t:'get',ids:['h_dispatch']},
+ {t:'chap',i:0,s:'高速道路では、後続車から身を守る位置取りから',m:'判断'},
+ {t:'narr',x:'霧の中に、ハザードランプの列がぼんやり見えてきた。'},
+ {t:'choice',q:'現着時、最初にどうする？',o:[
+  {l:'車列の横をすり抜けて、事故車両のすぐ横に止める',ok:0,fb:'霧の車列をすり抜けるのは二次事故のもと。事故車両の真横は救出の妨げにもなる。'},
+  {l:'消防車両を後方に斜めに止めて盾にし、MCIを宣言して後方警戒を指示する',ok:1,fb:'正解。高速道路では、まず後続車から自分たちを守る。車両で防御し、発炎筒と矢印板で警戒し、通行止めを要請する。'},
+  {l:'渋滞の最後尾に止めて、歩いて現場へ向かう',ok:0,fb:'最後尾は追突される危険が一番高い場所。警戒なしに止まってはいけない。'}]},
+ {t:'say',w:'sakaki',x:'後方警戒を開始した。高速隊に上下線の通行止めを要請している。'},
+ {t:'chap',i:1,s:'後続車・電気自動車・危険物',m:'現場調査 → 指揮ミーティング'},
+ {t:'get',ids:['ev_3s']},
+ {t:'narr',x:'霧の切れ間から、事故の全体を確かめる。'},
+ {t:'explore',id:'hwy'},
+ {t:'say',w:'sak',e:'a',x:'隊長、車線の上でそのまま救護を始めましょう！'},
+ {t:'debate',id:'h_d1'},
+ {t:'say',w:'sakaki',x:'通行止め完了。EVはメーカーの手順で電源を遮断する。トラックの溶剤には近づくな。'},
+ {t:'say',w:'sak',e:'s',x:'霧で見えない危険が、こんなにあったなんて……。'},
+ {t:'chap',i:2,s:'台数と、特別な配慮が必要な人',m:'聞き取り → 指揮ミーティング'},
+ {t:'narr',x:'胸を押さえたトラックの運転手が、ガードレールの外から声をかけてきた。'},
+ {t:'interview',id:'hwy'},
+ {t:'get',ids:['ev_methane']},
+ {t:'say',w:'oni',e:'a',x:'第一報を読み上げます。確認をお願いします。'},
+ {t:'debate',id:'h_d2'},
+ {t:'say',w:'oni',e:'s',x:'危険物と、妊婦さんと子ども。追加で送ります。'},
+ {t:'say',w:'cmd',x:'指令了解。上下線は通行止め済み。救急隊の増隊、ドクターヘリ、DMATを出場させる。周産期センターに受け入れを照会する。'},
+ {t:'chap',i:3,s:'事故車両の前方に拠点をつくる',m:'配置マップ'},
+ {t:'say',w:'sakaki',x:'事故車両の前方は空いている。拠点は下流側に作ってくれ。'},
+ {t:'mapplace',id:'hwy'},
+ {t:'chap',i:4,s:'妊婦・子ども・頸髄損傷',m:'救護所シミュレーション'},
+ {t:'say',w:'tad',x:'応援の田所です。妊婦さんと子どもがいます。搬送先の選び方が難しくなりますよ。'},
+ {t:'sim',id:'hwy'},
+ {t:'say',w:'oni',x:'通行止めの解除まで、後方警戒を続けます。'},
+ {t:'say',w:'you',x:'見えない後ろを守ってから、前の命に向き合う。それが高速道路の指揮だ。'},
+ {t:'result'}];
+const STORY_FIRE=[
+ {t:'title'},
+ {t:'narr',x:'18時10分。夕方の買い物客でにぎわうショッピングセンターから、火災の通報が入った。'},
+ {t:'say',w:'cmd',x:'救急1、出場せよ。駅前のショッピングセンター3階から出火、黒煙。避難者多数、負傷者ありの模様。'},
+ {t:'say',w:'oni',e:'a',x:'夕方の時間帯、客が多いですね。'},
+ {t:'say',w:'sak',x:'煙を吸った人がたくさん出てるかも……。'},
+ {t:'get',ids:['f_dispatch']},
+ {t:'chap',i:0,s:'火災現場では、消防活動の邪魔をしない位置から',m:'判断'},
+ {t:'narr',x:'黒煙が上がる建物が見えてきた。駐車場には避難した人があふれている。'},
+ {t:'choice',q:'現着時、最初にどうする？',o:[
+  {l:'正面入口に横付けして、出てくる人をすぐ受け取る',ok:0,fb:'正面入口は避難経路で、消防活動の場所。落下物の危険もある。'},
+  {l:'建物から離れた風上に停車し、MCIを宣言して防災センター・消防隊と情報を共有する',ok:1,fb:'正解。風上の離れた場所に拠点を置き、防災センターから残留者と被害の情報を得る。'},
+  {l:'消防隊を手伝って、ホースを延ばす',ok:0,fb:'救急隊の役割は救護の指揮。消火は消防隊に任せる。'}]},
+ {t:'say',w:'sakaki',x:'消防隊、内部進入を開始する。救急隊は救護をまとめてくれ。'},
+ {t:'chap',i:1,s:'煙・落下物・消防活動スペース',m:'現場調査 → 指揮ミーティング'},
+ {t:'get',ids:['ev_3s']},
+ {t:'narr',x:'建物の周りを見て回る。消防車両が次々と到着している。'},
+ {t:'explore',id:'fire'},
+ {t:'say',w:'sak',e:'a',x:'隊長、出てくる人を入口の前で受け止めましょう！'},
+ {t:'debate',id:'f_d1'},
+ {t:'say',w:'sakaki',x:'はしご車を正面に部署した。建物の周りには近づくな。ガラスが落ちてくる。'},
+ {t:'say',w:'sak',e:'s',x:'入口の前は、一番危ない場所だったんですね。'},
+ {t:'chap',i:2,s:'館内の情報を集める',m:'聞き取り → 指揮ミーティング'},
+ {t:'narr',x:'防災センターの担当者が、館内図を手に駆け寄ってきた。'},
+ {t:'interview',id:'fire'},
+ {t:'get',ids:['ev_methane']},
+ {t:'say',w:'oni',e:'a',x:'第一報を読み上げます。確認をお願いします。'},
+ {t:'debate',id:'f_d2'},
+ {t:'say',w:'oni',e:'s',x:'人数と残留者の情報、訂正して送ります。'},
+ {t:'say',w:'cmd',x:'指令了解。救急隊の増隊とDMATを出場させる。熱傷センターに受け入れを照会する。'},
+ {t:'chap',i:3,s:'救護所と避難者の集合場所',m:'配置マップ'},
+ {t:'say',w:'sakaki',x:'風は南西からだ。東側には煙がかかっている。'},
+ {t:'mapplace',id:'fire'},
+ {t:'chap',i:4,s:'CO中毒・気道熱傷・急病',m:'救護所シミュレーション'},
+ {t:'say',w:'tad',x:'応援の田所です。元気そうに見える人の中に、CO中毒がいるかもしれません。'},
+ {t:'sim',id:'fire'},
+ {t:'say',w:'oni',x:'鎮火の見込みです。救護所を後着の指揮隊に引き継ぎます。'},
+ {t:'say',w:'you',x:'元気に見えても安心しない。煙の現場は、それを教えてくれる。'},
+ {t:'result'}];
+const STORY_TRAIN=[
+ {t:'title'},
+ {t:'narr',x:'13時05分。郊外の線路で、普通列車が脱線したとの通報が入った。'},
+ {t:'say',w:'cmd',x:'救急1、出場せよ。郊外の路線、駅から約1kmの踏切付近で列車脱線。車両横転、乗客多数負傷の模様。'},
+ {t:'say',w:'oni',e:'a',x:'列車事故は、傷病者の数が読めません。'},
+ {t:'say',w:'sak',x:'乗客、何人乗ってたんだろう……。'},
+ {t:'get',ids:['t_dispatch']},
+ {t:'chap',i:0,s:'鉄道事故では、電気と列車を止めてから',m:'判断'},
+ {t:'narr',x:'踏切の向こう、盛土の上で車両が横倒しになっている。'},
+ {t:'choice',q:'現着時、最初にどうする？',o:[
+  {l:'盛土を上って、すぐに横転した車両へ向かう',ok:0,fb:'架線の送電と隣の線路の列車が止まったか、まだわからない。確認前に線路に上がるのは危険。'},
+  {l:'踏切付近に停車してMCIを宣言し、鉄道事業者に送電停止と列車防護を確認する',ok:1,fb:'正解。鉄道事故は、き電停止（架線の送電停止）と列車防護（他の列車を止めること）を確認してから線路に入る。'},
+  {l:'駅へ向かって、駅員から情報を集める',ok:0,fb:'現場から離れると全体が見えなくなる。情報は現場で鉄道事業者と共有する。'}]},
+ {t:'say',w:'oni',x:'鉄道事業者に連絡を取ります。'},
+ {t:'chap',i:1,s:'架線・隣の線路・盛土',m:'現場調査 → 指揮ミーティング'},
+ {t:'get',ids:['ev_3s']},
+ {t:'narr',x:'踏切から、盛土の上の現場を確かめる。'},
+ {t:'explore',id:'train'},
+ {t:'say',w:'sak',e:'a',x:'隊長、車両によじ登れば、すぐ中に入れます！'},
+ {t:'debate',id:'t_d1'},
+ {t:'say',w:'sakaki',x:'鉄道事業者から、送電停止と隣の線路の列車停止を確認した。これで線路に入れる。'},
+ {t:'say',w:'sak',e:'s',x:'電気が止まっているか、確認してからじゃないといけないんですね。'},
+ {t:'chap',i:2,s:'乗客数と閉じ込め',m:'聞き取り → 指揮ミーティング'},
+ {t:'narr',x:'腕を押さえた車掌が、盛土を下りてきた。'},
+ {t:'interview',id:'train'},
+ {t:'get',ids:['ev_methane']},
+ {t:'say',w:'oni',e:'a',x:'第一報を読み上げます。確認をお願いします。'},
+ {t:'debate',id:'t_d2'},
+ {t:'say',w:'oni',e:'s',x:'規模を見誤るところでした。訂正して送ります。'},
+ {t:'say',w:'cmd',x:'指令了解。救急隊と救助隊の増隊、DMAT2隊、ドクターヘリを出場させる。'},
+ {t:'chap',i:3,s:'踏切から学校まで',m:'配置マップ'},
+ {t:'say',w:'sakaki',x:'近くの小学校が、体育館と校庭を貸してくれるそうだ。'},
+ {t:'mapplace',id:'train'},
+ {t:'chap',i:4,s:'挟まれ・大量出血・多数の軽症者',m:'救護所シミュレーション'},
+ {t:'say',w:'tad',x:'応援の田所です。挟まれている人の救出は長くかかります。救出前輸液のタイミングに注意を。'},
+ {t:'sim',id:'train'},
+ {t:'say',w:'oni',x:'救護所の活動を、後着の指揮隊に引き継ぎます。'},
+ {t:'say',w:'you',x:'止めるべきものを止めてから動く。それが現場を守る指揮だ。'},
+ {t:'result'}];
+const SC={
+ bus:{n:'マイクロバス横転',when:'16:00・山あいの県道',learn:['燃料漏れ・電線','METHANE','START/PAT','クラッシュ症候群'],story:S},
+ chem:{n:'化学工場の有毒ガス漏えい',when:'10:40・沿岸工業団地',learn:['風上からの接近','ゾーニング','除染','遅発性の悪化'],story:STORY_CHEM},
+ hwy:{n:'高速道路の多重衝突',when:'7:52・霧の下り線',learn:['後方警戒','EV・危険物','妊婦と小児','頸髄損傷'],story:STORY_HWY},
+ fire:{n:'商業施設の火災',when:'18:24・駅前ショッピングセンター',learn:['落下物・活動スペース','群衆管理','CO中毒','気道熱傷'],story:STORY_FIRE},
+ train:{n:'列車の脱線事故',when:'13:40・郊外の踏切付近',learn:['き電停止・列車防護','多数の挟まれ','大量出血','多数の軽症者'],story:STORY_TRAIN}
+};
+
+
+/* ===================== 救護所ガイド ===================== */
+const GSTEPS=[
+ {on:'open',sel:'.pc',t:'まず傷病者のカードをタップして、詳しく観察しよう。いちばん上の「未判定」から見ていくのが基本。'},
+ {on:'tag',sel:'.tagbtns',t:'バイタルと所見を見てタグを付けよう。迷ったら画面下の「基準」で判定基準を確認できる。'},
+ {on:'act',sel:'.acts',t:'次に処置を指示しよう。赤なら気道確保・止血・酸素など。空いている人員が資格の低い順に自動で割り当たる。灰色の項目は、理由が下に書いてある。'},
+ {on:'close',sel:'#pclose',t:'指示を出したら「救護所に戻る」。ほかの傷病者も同じように、観察→タグ→処置を回そう。'},
+ {on:'next',sel:'.rrow',t:'上の列が、いま空いている人員と資器材の数。全員に手は回らない。誰に人を付けるかが判断のしどころ。',btn:'わかった'},
+ {on:'turn',sel:'#eb',t:'指示を出し終えたら「ターン終了」。2分進み、処置の結果や容態の変化が報告される。'},
+ {on:'next',sel:'.pc .ago:not(:empty)',t:'カード右上の「○分前」は最後に観察した時刻。人が付いていない傷病者は、悪化しても気づけない。定期的に「観察・評価」で見直そう。',btn:'わかった'},
+ {on:'next',sel:'#vb',t:'救急車が着いたら「搬送」から送り出す。赤は三次へ。受入の枠には上限がある。ガイドはここまで。',btn:'ガイドを終える'}];
+const GD={on:false,i:0};
+function guideStart(){GD.on=true;GD.i=0;guideShow()}
+function guideEnd(){GD.on=false;const g=$('#guide');g&&g.remove();document.querySelectorAll('.glow').forEach(e=>e.classList.remove('glow'));try{localStorage.setItem('gc-guide','done')}catch(e){}}
+function guideShow(){
+  document.querySelectorAll('.glow').forEach(e=>e.classList.remove('glow'));
+  let g=$('#guide');if(!GD.on){g&&g.remove();return}
+  const st=GSTEPS[GD.i];if(!st)return guideEnd();
+  if(!g){g=document.createElement('div');g.id='guide';g.setAttribute('role','status');document.body.appendChild(g)}
+  g.innerHTML=`<b>ガイド ${GD.i+1}/${GSTEPS.length}</b><p>${st.t}</p><div class="gbtns">${st.btn?`<button type="button" id="gnext">${st.btn}</button>`:''}<button type="button" class="sk" id="gskip">スキップ</button></div>`;
+  const nb=$('#gnext');if(nb)nb.onclick=()=>{sfx('tap');GD.i++;guideShow()};
+  $('#gskip').onclick=guideEnd;
+  const tg=document.querySelector(st.sel);if(tg)tg.classList.add('glow');
+  g.classList.remove('bot');
+  if(tg){const r=tg.getBoundingClientRect(),gh=g.getBoundingClientRect().height;if(r.top<gh+24)g.classList.add('bot')}
+}
+function guide(ev){if(!GD.on)return;const st=GSTEPS[GD.i];if(st&&st.on===ev){GD.i++;setTimeout(guideShow,ev==='turn'?50:0)}else setTimeout(guideShow,0)}
+
+/* ===================== 途中保存 ===================== */
+const SAVEKEY='gc-save-v1';
+function saveGame(){
+  try{
+    const g={...G,ev:[...G.ev]};
+    const d={v:1,t:Date.now(),G:g,sim:null};
+    if(G.inSim&&SIM&&!SIM.done){d.sim=JSON.stringify({...SIM,cfg:undefined,promptIds:SIM.prompts.map(v=>v.id),prompts:undefined},(k,v)=>v instanceof Set?{__set:[...v]}:v)}
+    localStorage.setItem(SAVEKEY,JSON.stringify(d));
+  }catch(e){}
+}
+function clearSave(){try{localStorage.removeItem(SAVEKEY)}catch(e){}}
+function loadSave(){try{const d=JSON.parse(localStorage.getItem(SAVEKEY)||'null');if(!d||d.v!==1||!SC[d.G.sc])return null;return d}catch(e){return null}}
+function saveLabel(d){
+  const g=d.G,c=SC[g.sc];
+  let where;
+  if(d.sim){const o=JSON.parse(d.sim);where=`救護所 ${fmtTat(o)}`}
+  else if(g.solo)where='救護所シミュレーション';
+  else{const st=c.story[g.i]||{};where=g.chapter>=0?`${CS[g.chapter][0]}（${CS[g.chapter][1]}）の章`:'出場'}
+  const ago=Math.max(1,Math.round((Date.now()-d.t)/60000));
+  return{name:c.n,where,ago:ago<60?`${ago}分前`:ago<1440?`${Math.round(ago/60)}時間前`:`${Math.round(ago/1440)}日前`};
+}
+function fmtTat(o){const b=(SIMS[o.id]&&SIMS[o.id].start)||[16,0];const m=b[0]*60+b[1]+2*o.t;return `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`}
+function resumeGame(){
+  const d=loadSave();if(!d)return;
+  G={...d.G,ev:new Set(d.G.ev)};titleSel=G.sc;
+  document.querySelector('.hud').hidden=false;hud();
+  if(d.sim){
+    SIM=JSON.parse(d.sim,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?new Set(v.__set):v);
+    SIM.cfg=SIMS[SIM.id];SIM.prompts=(SIM.promptIds||[]).map(id=>SIM.veh.find(v=>v.id===id)).filter(Boolean);delete SIM.promptIds;
+    bgm('aid');simRender();if(SIM.prompts.length)runPrompts();
+  }else if(G.solo){simReady(true,G.sc)}
+  else render();
+}
+
+/* ===================== 効果音（Web Audioで合成） ===================== */
+const SE=(()=>{let ctx=null,master=null,noiseBuf=null;
+ const init=()=>{if(ctx)return ctx;const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;ctx=new C();master=ctx.createGain();master.gain.value=.5;const comp=ctx.createDynamicsCompressor();comp.threshold.value=-10;comp.ratio.value=6;master.connect(comp).connect(ctx.destination);
+   noiseBuf=ctx.createBuffer(1,ctx.sampleRate*.5,ctx.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return ctx};
+ const ok=()=>{if(!BGM.on)return false;if(!init())return false;if(ctx.state==='suspended')ctx.resume();return true};
+ const tone=(f,t0,dur,{type='sine',vol=.3,f2=null,att=.005}={})=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t0+dur);
+   g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+att);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);o.connect(g).connect(master);o.start(t0);o.stop(t0+dur+.02)};
+ const noise=(t0,dur,{vol=.2,freq=2000,q=1,type='bandpass'}={})=>{const n=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();n.buffer=noiseBuf;f.type=type;f.frequency.value=freq;f.Q.value=q;
+   g.gain.setValueAtTime(vol,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);n.connect(f).connect(g).connect(master);n.start(t0);n.stop(t0+dur+.02)};
+ const P={
+  tap(){const t=ctx.currentTime;tone(1100,t,.06,{type:'triangle',vol:.3});tone(2200,t,.03,{type:'sine',vol:.12});noise(t,.025,{vol:.12,freq:4000,q:1})},
+  radio(){const t=ctx.currentTime;noise(t,.18,{vol:.18,freq:1800,q:.8});tone(1250,t+.16,.09,{type:'square',vol:.07})},
+  get(){const t=ctx.currentTime;[784,988,1319].forEach((f,i)=>tone(f,t+i*.07,.35,{type:'triangle',vol:.16}))},
+  chap(){const t=ctx.currentTime;noise(t,.45,{vol:.25,freq:600,q:.5,type:'lowpass'});tone(110,t,.6,{vol:.35,f2:55})},
+  stamp(){const t=ctx.currentTime;
+   /* ため：上昇するスウッシュ */
+   const n=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();n.buffer=noiseBuf;n.loop=true;f.type='bandpass';f.Q.value=1.2;
+   f.frequency.setValueAtTime(400,t);f.frequency.exponentialRampToValueAtTime(5000,t+.22);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.35,t+.2);g.gain.exponentialRampToValueAtTime(.0001,t+.26);
+   n.connect(f).connect(g).connect(master);n.start(t);n.stop(t+.3);
+   const h=t+.22;
+   /* 一撃：重いキックとクラック */
+   tone(180,h,.45,{vol:1,f2:38,att:.002});tone(90,h,.6,{type:'triangle',vol:.5,f2:40,att:.002});
+   noise(h,.18,{vol:.55,freq:2500,q:.6});noise(h,.06,{vol:.4,freq:7000,q:.8});
+   /* 決め：明るい上昇ファンファーレ */
+   [[523,0],[659,.07],[784,.14],[1047,.21]].forEach(([fq,d])=>{tone(fq,h+.05+d,.18,{type:'square',vol:.07});tone(fq*2,h+.05+d,.14,{type:'triangle',vol:.05})});
+   [1047,1319,1568].forEach(fq=>tone(fq,h+.33,1.1,{type:'triangle',vol:.09,att:.01}));
+   /* きらめき */
+   for(let i=0;i<6;i++)tone(2600+i*380,h+.36+i*.045,.18,{type:'sine',vol:.04})},
+  wrong(){const t=ctx.currentTime;tone(160,t,.28,{type:'square',vol:.12,f2:110});tone(150,t+.12,.28,{type:'square',vol:.1,f2:100})},
+  good(){const t=ctx.currentTime;tone(880,t,.12,{type:'triangle',vol:.16});tone(1320,t+.09,.25,{type:'triangle',vol:.16})},
+  look(){const t=ctx.currentTime;tone(660,t,.1,{type:'sine',vol:.12,f2:990})},
+  miss(){const t=ctx.currentTime;tone(300,t,.12,{type:'sine',vol:.08,f2:220})},
+  place(){const t=ctx.currentTime;tone(520,t,.12,{type:'sine',vol:.2,f2:780})},
+  act(){const t=ctx.currentTime;tone(990,t,.06,{type:'triangle',vol:.1});tone(1480,t+.05,.08,{type:'triangle',vol:.08})},
+  turn(){const t=ctx.currentTime;noise(t,.22,{vol:.12,freq:900,q:.7});tone(440,t+.05,.15,{vol:.1})},
+  alarm(){const t=ctx.currentTime;for(let i=0;i<3;i++){tone(960,t+i*.2,.12,{type:'square',vol:.09});}},
+  flat(){const t=ctx.currentTime;tone(1000,t,1.4,{type:'sine',vol:.14,att:.01})},
+  siren(){const t=ctx.currentTime;for(let i=0;i<4;i++)tone(i%2?770:960,t+i*.3,.29,{type:'square',vol:.05,att:.02})},
+  depart(){const t=ctx.currentTime;tone(220,t,.6,{type:'sawtooth',vol:.06,f2:330});noise(t,.5,{vol:.08,freq:400,q:.6,type:'lowpass'})},
+  rank(){const t=ctx.currentTime;tone(98,t,.5,{vol:.4,f2:60});[392,494,587,784].forEach((f,i)=>tone(f,t+.25+i*.09,.6,{type:'triangle',vol:.12}))},
+  tick(){const t=ctx.currentTime;tone(2000,t,.03,{type:'square',vol:.04})}
+ };
+ return{play(n){try{if(ok()&&P[n])P[n]()}catch(e){}}};
+})();
+const sfx=n=>SE.play(n);
+/* ===================== BGM ===================== */
+const BGM_FILES={title:'bgm/The_Weight_of_a_Breath.mp3',dispatch:'bgm/Critical_Path.mp3',survey:'bgm/Unsolved_Presence.mp3',meeting:'bgm/Calculated_Momentum.mp3',map:'bgm/A_Map_of_Intent.mp3',aid:'bgm/The_Steady_Hand.mp3',result:'bgm/Where_the_Storm_Settles.mp3'};
+const BGM={on:false,cur:null,el:null,want:'title',vol:.45};
+try{BGM.on=localStorage.getItem('gc-bgm')==='1'}catch(e){}
+function fade(a,to,ms,done){const from=a.volume,t0=performance.now();const st=()=>{const k=Math.min(1,(performance.now()-t0)/ms);a.volume=from+(to-from)*k;if(k<1)requestAnimationFrame(st);else done&&done()};st()}
+function bgm(key){
+  BGM.want=key;
+  if(!BGM.on||BGM.cur===key)return;
+  const old=BGM.el;BGM.cur=key;
+  if(old)fade(old,0,700,()=>old.pause());
+  if(!key){BGM.el=null;return}
+  const a=new Audio(BGM_FILES[key]);a.loop=true;a.volume=0;a.preload='auto';BGM.el=a;
+  a.play().then(()=>fade(a,BGM.vol,900)).catch(()=>{BGM.cur=null});
+}
+function setSound(on){
+  BGM.on=on;try{localStorage.setItem('gc-bgm',on?'1':'0')}catch(e){}
+  document.querySelectorAll('.sndbtn,#sndt').forEach(b=>{b.textContent=on?'♪ オン':'♪ オフ';b.classList.toggle('on',on)});
+  if(on){BGM.cur=null;bgm(BGM.want)}else{const a=BGM.el;BGM.el=null;BGM.cur=null;if(a)fade(a,0,400,()=>a.pause())}
+}
+$('#sndbtn').onclick=()=>setSound(!BGM.on);
+document.querySelectorAll('.sndbtn').forEach(b=>{b.textContent=BGM.on?'♪ オン':'♪ オフ';b.classList.toggle('on',BGM.on)});
+document.addEventListener('pointerdown',()=>{if(BGM.on&&!BGM.el){BGM.cur=null;bgm(BGM.want)}},{capture:true});
+document.addEventListener('visibilitychange',()=>{if(!BGM.el)return;if(document.hidden)BGM.el.pause();else if(BGM.on)BGM.el.play().catch(()=>{})});
+render();
+</script>
+
+<script>
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+</script>
+</body>
+</html>
