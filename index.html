@@ -348,6 +348,13 @@ button:focus-visible{outline:3px solid var(--weak);outline-offset:2px}
 .tcard i{font-style:normal;font-family:var(--f-sys);font-size:10px;color:var(--night);background:var(--weak);border-radius:2px;padding:0 4px}
 .tcard.new{animation:cardin .5s cubic-bezier(.2,1.6,.4,1);border-color:var(--weak);box-shadow:0 0 12px rgba(255,174,31,.5)}
 @keyframes cardin{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+/* Meeting card info + coach */
+.bulinfo{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--weak);border-radius:4px;padding:8px 10px;font-size:14px;min-height:3.4em;display:grid;gap:2px}
+.bulinfo b{color:var(--weak);font-size:14px}
+.bulinfo span{color:var(--fg)}
+.coach{background:#2b2410;border:1px solid var(--weak);border-radius:6px;padding:8px 10px;font-size:14px;line-height:1.6}
+.coach b{display:block;font-family:var(--f-sys);font-size:11px;color:var(--weak);letter-spacing:.08em}
+.ttl-tut{background:none;border:1px dashed var(--weak);color:var(--weak);border-radius:6px;padding:9px 12px;font-weight:700;font-size:14px;width:100%}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 
@@ -538,16 +545,18 @@ function title(){
   const c=SC[titleSel];
   stage.innerHTML=`<div class="ttl">
    <header class="ttl-h"><h1>現場コマンダー</h1><span>MCLS 多数傷病者対応トレーニング</span></header>
-   <div class="ttl-hero"><img src="${IMG[titleSel]}" alt="${c.n}の現場"><div class="ttl-cap"><span class="ttl-no">CASE ${String(Object.keys(SC).indexOf(titleSel)+1).padStart(2,'0')}</span><b>${c.n}</b><span>${c.when}</span></div></div>
-   <div class="ttl-tabs" role="tablist">${Object.entries(SC).map(([k,v])=>`<button type="button" role="tab" aria-selected="${k===titleSel}" class="ttl-tab ${k===titleSel?'on':''}" data-k="${k}"><img src="${IMG[k]}" alt=""><span>${v.n.replace(/の.*$/,'').replace('マイクロバス横転','バス横転')}</span></button>`).join('')}</div>
+   <div class="ttl-hero"><img src="${IMG[titleSel]}" alt="${c.n}の現場"><div class="ttl-cap"><span class="ttl-no">CASE ${String(Object.keys(SC).filter(k=>k!=='tut').indexOf(titleSel)+1).padStart(2,'0')}</span><b>${c.n}</b><span>${c.when}</span></div></div>
+   <div class="ttl-tabs" role="tablist">${Object.entries(SC).filter(([k])=>k!=='tut').map(([k,v])=>`<button type="button" role="tab" aria-selected="${k===titleSel}" class="ttl-tab ${k===titleSel?'on':''}" data-k="${k}"><img src="${IMG[k]}" alt=""><span>${v.n.replace(/の.*$/,'').replace('マイクロバス横転','バス横転')}</span></button>`).join('')}</div>
    <div class="ttl-learn">${c.learn.map(l=>`<span>${l}</span>`).join('')}</div>
    ${(()=>{const d=loadSave();if(!d)return'';const l=saveLabel(d);return`<button type="button" class="ttl-resume" id="rs"><span><b>続きから</b>${l.name}・${l.where}（${l.ago}）</span><i>再開 ▶</i></button>`})()}
+   <button type="button" class="ttl-tut" id="tut">${(()=>{try{return localStorage.getItem('gc-tut')==='done'}catch(e){return false}})()?'チュートリアルをもう一度':'はじめての人は：チュートリアル（約5分）'}</button>
    <div class="ttl-act"><button class="primary" id="go" type="button">出場する</button><button class="ghost" id="so" type="button">救護所だけ</button></div>
    <div class="ttl-foot"><button type="button" id="sndt" class="lnk ${BGM.on?'on':''}">${BGM.on?'♪ オン':'♪ オフ'}</button><button type="button" id="how" class="lnk">遊び方</button><button type="button" id="dj" class="lnk">トリアージ道場</button></div></div>`;
   stage.querySelectorAll('.ttl-tab').forEach(b=>b.onclick=()=>{titleSel=b.dataset.k;title()});
   $('#go').onclick=()=>{G.sc=titleSel;reset();G.i=1;render()};
   $('#so').onclick=()=>{G.sc=titleSel;reset();G.chapter=4;document.querySelector('.hud').hidden=false;hud();simReady(true,G.sc)};
   const rs=$('#rs');if(rs)rs.onclick=resumeGame;
+  $('#tut').onclick=()=>{G.sc='tut';reset();G.i=1;render()};
   $('#dj').onclick=dojo;$('#sndt').onclick=()=>setSound(!BGM.on);
   $('#how').onclick=()=>sheet('遊び方',`<ul class="msgs"><li><b>C・S・C・A</b><br>写真で現場を調べて根拠カードを集め、指揮ミーティングで隊員の判断を是正する。最後に拠点を地図に配置する。</li><li><b>T・T・T</b><br>ターン制の救護所シミュレーション。限られた人員・資器材・救急車で傷病者を救う。</li><li><b>トリアージ道場</b><br>START法の60秒仕分け。</li></ul><p class="note">教育用の架空シナリオです。実際の活動は各地域のプロトコル・MCLS標準に従ってください。</p>`,[['閉じる']]);
 }
@@ -566,25 +575,33 @@ let D=null;
 function stopDebate(){if(D){clearTimeout(D.tm);D=null}}
 const fmt=(t,solved)=>t.replace(/\[([^|\]]+)\|(\w+)\]/g,(m,s,id)=>`<button type="button" class="weak ${solved.has(id)?'done':''}" data-w="${id}">${s}</button>`);
 const keys=d=>Object.keys(d.wk).filter(k=>d.wk[k].ans);
+const HAND=5;
+function pickHand(d){
+  const own=d.bullets.filter(b=>G.ev.has(b));
+  const need=[];Object.values(d.wk).forEach(w=>{if(!w.ans)return;const c=w.ans.find(e=>own.includes(e));if(c&&!need.includes(c))need.push(c)});
+  const extra=own.filter(b=>!need.includes(b)).slice(0,Math.max(1,HAND-need.length));
+  return own.filter(b=>need.includes(b)||extra.includes(b));
+}
 function debate(id){
-  const d=DB[id];D={id,d,idx:0,solved:new Set(),bul:null,paused:false,tm:null,hold:false};
+  const d=DB[id];D={id,d,idx:0,solved:new Set(),bul:null,paused:false,tm:null,hold:false,hand:pickHand(d)};
   stage.innerHTML=`<div class="debate"><div class="dhead"><span class="dlabel">指揮ミーティング</span><span class="dtitle">${d.title}</span><span class="dleft" id="left"></span></div>
    <div class="arena" id="arena"></div>
    <div class="ctrl"><button type="button" id="pv" aria-label="前の発言">◀</button><div class="dots" id="dots"></div><button type="button" id="ps" aria-label="一時停止">❚❚</button><button type="button" id="nx" aria-label="次の発言">▶</button></div>
+   ${d.tip?`<div class="coach"><b>教官メモ</b>${d.tip}</div>`:''}
    <div class="guide">根拠カードを選んでから、オレンジの言葉をタップして示す</div>
-   <div class="bullets">${d.bullets.filter(b=>G.ev.has(b)).map(b=>`<button type="button" class="bul" data-b="${b}">${EV[b][0]}</button>`).join('')}</div>
-   <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="ghost sm" id="evv" type="button">選んだカードの中身を見る</button><button class="ghost sm" id="nog" type="button">根拠が足りない（このまま進める）</button></div></div>`;
+   <div class="bullets">${D.hand.map(b=>`<button type="button" class="bul" data-b="${b}">${EV[b][0]}</button>`).join('')||'<span class="note">使える根拠カードがない。</span>'}</div>
+   <div class="bulinfo" id="bulinfo"><span class="note">カードを選ぶと、ここに中身が出る。</span></div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="ghost sm" id="nog" type="button">根拠が足りない（このまま進める）</button></div></div>`;
   $('#pv').onclick=()=>show(D.idx-1);$('#nx').onclick=()=>show(D.idx+1);
   $('#ps').onclick=()=>{D.paused=!D.paused;$('#ps').textContent=D.paused?'▶︎':'❚❚';show(D.idx)};
-  stage.querySelectorAll('.bul').forEach(b=>b.onclick=()=>{D.bul=b.dataset.b;stage.querySelectorAll('.bul').forEach(x=>x.classList.toggle('sel',x===b))});
+  stage.querySelectorAll('.bul').forEach(b=>b.onclick=()=>{sfx('tap');D.bul=b.dataset.b;stage.querySelectorAll('.bul').forEach(x=>x.classList.toggle('sel',x===b));$('#bulinfo').innerHTML=`<b>${EV[D.bul][0]}</b><span>${EV[D.bul][1]}</span>`});
   $('#nog').onclick=()=>{D.hold=true;clearTimeout(D.tm);
     sheet('根拠がないまま進めますか？','<p>残っている誤りは是正されないまま活動が始まります。現場で集められなかった根拠は、あとから取り戻せません。</p>',[['このまま進める',giveUp],['ミーティングに戻る',()=>{D.hold=false;show(D.idx)}]])};
-  $('#evv').onclick=()=>{if(!D.bul)return toast('先に根拠カードを選んでください');sheet(EV[D.bul][0],`<p>${EV[D.bul][1]}</p>`,[['閉じる']])};
   show(0);
 }
 function show(i){
   if(!D)return;const d=D.d,n=d.st.length;D.idx=(i+n)%n;clearTimeout(D.tm);
-  const s=d.st[D.idx],c=CH[s.w],dur=4800,a=$('#arena');
+  const s=d.st[D.idx],c=CH[s.w],dur=Math.max(4200,2600+s.t.replace(/\[|\|\w\]|\]/g,'').length*110),a=$('#arena');
   a.classList.toggle('paused',D.paused||D.hold);
   a.innerHTML=`<div class="spk">${c.img?`<img style="--c:${c.c}" src="${c.img.a||c.img.n}" alt="">`:`<i style="--c:${c.c}">${c.k}</i>`}${c.n}｜${c.r}</div><p class="stmt">${fmt(s.t,D.solved)}</p><div class="bar" style="animation-duration:${dur}ms"></div>`;
   $('#dots').innerHTML=d.st.map((_,k)=>`<i class="${k===D.idx?'on':''}"></i>`).join('');
@@ -642,6 +659,7 @@ function explore(id){
   const e=EXP[id];const found=new Set();let fresh=null;
   const draw=()=>{
     stage.innerHTML=`<div class="explore"><div class="dhead"><span class="dlabel">現場調査</span><span class="dtitle">${e.title}</span><span class="dleft">調べた ${found.size} か所</span></div>
+     ${e.tip?`<div class="coach"><b>教官メモ</b>${e.tip}</div>`:''}
      <p class="guide" style="margin:0">${e.intro}${matchMedia('(max-width:700px)').matches?'　画像は横にスクロールできる。':''}</p>
      ${e.img?`<div class="scene-wrap"><div class="scene" id="sc"><img src="${e.img}" alt="${e.alt||'現場写真'}" draggable="false">
       ${e.spots.map(p=>`<button type="button" class="hs ${found.has(p.id)?'done':''}" data-s="${p.id}" aria-label="${found.has(p.id)?p.n:'調べる場所'}" style="left:${p.b[0]}%;top:${p.b[1]}%;width:${p.b[2]}%;height:${p.b[3]}%"></button>`).join('')}</div></div>`
@@ -771,6 +789,7 @@ function mapPlace(id){
   const draw=()=>{
     const done=Object.keys(FACS).every(f=>place[f]);
     stage.innerHTML=`<div class="explore"><div class="dhead"><span class="dlabel">配置マップ</span><span class="dtitle">活動拠点の配置</span></div>
+     ${M.tip?`<div class="coach"><b>教官メモ</b>${M.tip}</div>`:''}
      <p class="guide" style="margin:0">下の施設を選び、地図の丸（A〜H）をタップして置く。置いた施設をもう一度選べば動かせる。1か所に置けるのは1つまで。</p>
      <div class="mapwrap">${mapSVG(M,place,false)}</div>
      <div class="mapinfo" id="mi">${sel?`<b>${FACS[sel].n}</b>を置く場所を選ぶ`:'場所をタップすると、その場所の様子がわかる'}</div>
@@ -911,14 +930,14 @@ function guideDefault(){try{return localStorage.getItem('gc-guide')!=='done'}cat
 function simReady(solo,id){
   bgm('aid');
   id=id||'bus';const C=SIMS[id];
-  stage.innerHTML=`<div class="ready"><span class="dlabel" style="align-self:flex-start">救護所シミュレーション</span><h2>救護所を回せ</h2>
+  stage.innerHTML=`<div class="ready"><span class="dlabel" style="align-self:flex-start">救護所シミュレーション</span><h2>救護所を回せ</h2>${C.tip?`<div class="coach"><b>教官メモ</b>${C.tip}</div>`:''}
    <ul><li>1ターン＝2分。${fmtT(0)}から${fmtT(C.maxT||20)}まで${C.maxT||20}ターン。傷病者は${C.pts().length}名</li>${C.rules?C.rules.map(r=>`<li>${r}</li>`).join(''):''}
    <li>傷病者をタップして、観察・タグ付け・処置を指示する。人員は資格の低い順に自動で割り当てる</li>
    <li>容態は観察した時点の値しか見えない。人が付いている傷病者だけ、毎ターン最新になる</li>
    <li>救急車が来たら、そのまま搬送に使うか、クルーを救護所に回すかを決める</li>
    <li>救命士の特定行為には指示要請が要る。医師が着いたら直接指示に切り替わる</li>
    <li>評価は、防ぎえた死・赤の見逃し時間・搬送先の適否</li></ul>
-   <label class="gchk"><input type="checkbox" id="gchk" ${guideDefault()?'checked':''}> 最初の2ターンは操作ガイドを表示する</label>
+   <label class="gchk"><input type="checkbox" id="gchk" ${guideDefault()||id==='tut'?'checked':''}> 最初の2ターンは操作ガイドを表示する</label>
    <div class="btns"><button class="primary" id="st" type="button">救護所を開設する</button><button class="ghost" id="ck" type="button">基準カードを確認する</button></div></div>`;
   if(solo){G.solo=true;saveGame()}
   $('#st').onclick=()=>{const gw=$('#gchk').checked;initSim(solo,id);setChap(4);simRender();if(gw)guideStart()};
@@ -1312,6 +1331,11 @@ function finishSort(){
 
 /* ---- Final result (story) ---- */
 function result(){
+  if(G.sc==='tut'){G.chapter=7;hud();clearSave();try{localStorage.setItem('gc-tut','done')}catch(e){}
+    stage.innerHTML=`<div class="result" style="margin:auto 0"><span class="note">チュートリアル完了</span><h2 style="font-family:var(--f-display);font-weight:400;font-size:32px;margin:0">準備完了</h2>
+     <ul class="msgs"><li>現場調査：写真をタップして根拠カードを集める</li><li>指揮ミーティング：カードを選んで、オレンジの言葉をタップ</li><li>配置マップ：施設を選んで地図の丸に置く</li><li>救護所：観察→タグ→処置→ターン終了→搬送</li></ul>
+     <div class="btns"><button class="primary" id="tt" type="button">シナリオを選んで出場する</button></div></div>`;
+    $('#tt').onclick=()=>{G.sc='bus';titleSel='bus';reset();G.i=0;render()};return}
   setTimeout(()=>sfx('rank'),200);
   G.chapter=7;hud();
   const sc=G.sim||{dead:0,under:0,pts:0,rank:'-'};
@@ -1971,6 +1995,42 @@ const SC={
 };
 
 
+/* ===================== チュートリアル ===================== */
+EXP.tut={img:'img/scene_bus.webp',alt:'想定訓練の現場写真',title:'想定訓練：現場の確認',checks:9,
+ intro:'写真の気になる場所をタップして調べよう。',
+ tip:'写真のどこかに危険が隠れている。タップして調べると説明が出て、危険を見つけると「根拠カード」が手に入る。何も無い場所をタップしても大丈夫。調べ終えたら下の「調査を終えて…」を押そう。',
+ spots:EXP.bus.spots.filter(p=>['oil','wire','bag','sky'].includes(p.id))};
+DB.tut_d={title:'想定訓練：すぐ車内に入るべきか',bullets:['ev_fuel','ev_wire','ev_weather','ev_3s'],
+ tip:'佐倉の発言が流れていく。<b style="display:inline;color:var(--weak)">オレンジの言葉</b>が怪しい所だ。①下の根拠カードを選ぶ（中身がすぐ下に出る）→②間違っている言葉をタップ。誤りでない言葉や合わないカードだと信頼が1つ減る。読みきれない時は ❚❚ で止められる。',
+ st:[{w:'sak',t:'車内には[けが人がいます|a]！'},{w:'sak',t:'路面の液体は[ただの水|b]です。このまま近づきます'}],
+ wk:{a:{fb:'けが人がいるのは事実です。そこは誤りではありませんよ'},
+     b:{ans:['ev_fuel','ev_weather'],fb:'今日は雨が降っておらず、路面の液体は燃料だ。着火すれば救助者も巻き込まれる。消防隊の警戒とエンジン停止が先。',miss:'燃料漏れに気づかないまま近づいてしまった。'}}};
+MAPS.tut={...MAPS.bus,facs:{tri:FACS.tri,aid:FACS.aid},tip:'下の施設を選んでから、地図の丸（A〜H）をタップして置く。施設を選ばずに丸をタップすると、その場所の様子がわかる。危険区域（赤い点線）・風向き・救急車の通り道を見て決めよう。'};
+SIMS.tut={...SIMS.bus,start:[10,0],maxT:6,pts:()=>busPatients().filter(p=>['A','E','C','H'].includes(p.id)),
+ sched:[AMB(2,'救急3','小川','石田','上野')],ev:null,hint:null,
+ tip:'練習用の小さな救護所。傷病者4名、12分間。ガイドに従って「観察→タグ→処置→ターン終了→搬送」の流れを体験しよう。'};
+const STORY_TUT=[
+ {t:'title'},
+ {t:'narr',x:'訓練棟。今日は多数傷病者対応の想定訓練だ。'},
+ {t:'say',w:'oni',x:'教官役の大西だ。この画面は、文字のところをタップすると進む。'},
+ {t:'say',w:'oni',e:'a',x:'多数傷病者事故（MCI）の活動は、CSCATTTの順で考える。画面上の文字がその7つだ。今日は要点だけ体験しよう。'},
+ {t:'chap',i:1,s:'まずは自分たちの安全から',m:'現場調査 → 指揮ミーティング'},
+ {t:'say',w:'oni',x:'最初は現場調査だ。想定の現場写真を見て、危険がないか確かめてくれ。'},
+ {t:'explore',id:'tut'},
+ {t:'say',w:'sak',e:'a',x:'隊長、すぐ車内に入りましょう！'},
+ {t:'say',w:'oni',x:'待て。今の佐倉の判断に誤りがないか、指揮ミーティングで確かめる。集めた根拠カードを使ってくれ。'},
+ {t:'debate',id:'tut_d'},
+ {t:'say',w:'oni',e:'a',x:'そうだ。根拠を示して判断を正す。これが「是正」だ。本番では誤りが3つ、4つ混ざっている。'},
+ {t:'chap',i:3,s:'活動の拠点をどこに置くか',m:'配置マップ'},
+ {t:'say',w:'oni',x:'次は拠点の配置だ。今日はトリアージポストと救護所の2つだけ置いてみよう。'},
+ {t:'mapplace',id:'tut'},
+ {t:'chap',i:4,s:'限られた人と物で、救護所を回す',m:'救護所シミュレーション'},
+ {t:'say',w:'oni',x:'最後は救護所だ。人も資器材も足りない中で、誰に何をするかを決める。ガイドが出るから、その通りに進めてみよう。'},
+ {t:'sim',id:'tut'},
+ {t:'say',w:'oni',e:'a',x:'お疲れさま。これで一通りの流れは終わりだ。あとは本番のシナリオに出場して、判断を磨いてくれ。'},
+ {t:'result'}];
+SC.tut={n:'チュートリアル',when:'訓練棟・想定訓練',learn:['画面の進め方','根拠カード','是正','救護所の操作'],story:STORY_TUT};
+
 /* ===================== 救護所ガイド ===================== */
 const GSTEPS=[
  {on:'open',sel:'.pc',t:'まず傷病者のカードをタップして、詳しく観察しよう。いちばん上の「未判定」から見ていくのが基本。'},
@@ -2022,7 +2082,7 @@ function saveLabel(d){
 function fmtTat(o){const b=(SIMS[o.id]&&SIMS[o.id].start)||[16,0];const m=b[0]*60+b[1]+2*o.t;return `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`}
 function resumeGame(){
   const d=loadSave();if(!d)return;
-  G={...d.G,ev:new Set(d.G.ev)};titleSel=G.sc;
+  G={...d.G,ev:new Set(d.G.ev)};titleSel=G.sc==='tut'?'bus':G.sc;
   document.querySelector('.hud').hidden=false;hud();
   if(d.sim){
     SIM=JSON.parse(d.sim,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?new Set(v.__set):v);
@@ -2102,7 +2162,6 @@ document.addEventListener('pointerdown',()=>{if(BGM.on&&!BGM.el){BGM.cur=null;bg
 document.addEventListener('visibilitychange',()=>{if(!BGM.el)return;if(document.hidden)BGM.el.pause();else if(BGM.on)BGM.el.play().catch(()=>{})});
 render();
 </script>
-
 <script>
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 </script>
