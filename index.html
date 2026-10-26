@@ -355,6 +355,23 @@ button:focus-visible{outline:3px solid var(--weak);outline-offset:2px}
 .coach{background:#2b2410;border:1px solid var(--weak);border-radius:6px;padding:8px 10px;font-size:14px;line-height:1.6}
 .coach b{display:block;font-family:var(--f-sys);font-size:11px;color:var(--weak);letter-spacing:.08em}
 .ttl-tut{background:none;border:1px dashed var(--weak);color:var(--weak);border-radius:6px;padding:9px 12px;font-weight:700;font-size:14px;width:100%}
+/* Spotlight coach */
+#spot{position:fixed;inset:0;z-index:50;pointer-events:none}
+#spot[hidden]{display:none}
+#spot .blk{position:fixed;background:rgba(5,7,18,.72);pointer-events:auto}
+#spot.free .blk{background:rgba(5,7,18,.0);pointer-events:none}
+#spot .ring{position:fixed;border:3px solid var(--weak);border-radius:10px;box-shadow:0 0 0 4px rgba(255,174,31,.25),0 0 22px rgba(255,174,31,.7);animation:ringp 1.2s ease-in-out infinite}
+@keyframes ringp{50%{box-shadow:0 0 0 9px rgba(255,174,31,.08),0 0 10px rgba(255,174,31,.4)}}
+#spot .hand{position:fixed;width:46px;height:56px;margin:-6px 0 0 -12px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.6));animation:tapme 1.1s ease-in-out infinite}
+@keyframes tapme{0%,100%{transform:translate(8px,10px) scale(1)}45%{transform:translate(0,0) scale(.92)}55%{transform:translate(0,0) scale(.92)}}
+#spot .ripple{position:fixed;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:3px solid #fff;animation:rip 1.1s ease-out infinite}
+@keyframes rip{0%,40%{transform:scale(.2);opacity:0}45%{opacity:.9}100%{transform:scale(1.3);opacity:0}}
+#spot .bub{position:fixed;left:12px;right:12px;margin:0 auto;max-width:420px;background:#fff8e6;color:#1b1b22;border-radius:12px;padding:12px 14px 10px;font-size:15px;line-height:1.6;font-weight:700;pointer-events:auto;box-shadow:0 10px 30px rgba(0,0,0,.55);border:3px solid var(--weak)}
+#spot .bub small{display:block;font-family:var(--f-sys);font-weight:400;font-size:11px;color:#8a6a1a;margin-bottom:2px}
+#spot .bub .row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px}
+#spot .bub .sk{background:none;border:0;color:#6a6656;text-decoration:underline;font-size:12px;padding:2px}
+#spot .bub .nx{background:var(--siren);color:#fff;border:0;border-radius:6px;padding:7px 16px;font-weight:700;font-size:14px}
+#spot .bub.shk{animation:shake .35s}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 
@@ -495,7 +512,7 @@ function hud(){
   $('#evbtn').textContent='根拠カード '+G.ev.size;
 }
 function setChap(c){if(c>G.chapter){G.chapter=c;hud()}}
-function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;const gd=document.getElementById('guide');e.style.top=gd&&!gd.classList.contains('bot')?(gd.getBoundingClientRect().bottom+8)+'px':'';clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2000)}
+function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;const sp=document.getElementById('spot');e.style.zIndex=60;e.style.top=sp&&!sp.hidden?'auto':'';e.style.bottom=sp&&!sp.hidden?'calc(16px + env(safe-area-inset-bottom,0px))':'';clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2000)}
 function stamp(t){sfx('stamp');setTimeout(()=>{const f=document.createElement('div');f.className='hitflash';document.body.appendChild(f);setTimeout(()=>f.remove(),450);const a=document.getElementById('app');a.classList.remove('shake');void a.offsetWidth;a.classList.add('shake')},220);const e=$('#stamp');e.innerHTML=`<span>${t}</span>`;e.hidden=false;setTimeout(()=>e.hidden=true,1100)}
 function sheet(h,body,btns){
   const ov=document.createElement('div');ov.className='ov';
@@ -521,6 +538,7 @@ function render(){
   const s=SC[G.sc].story[G.i];hud();stage.scrollTop=0;
   if(s.t==='result')clearSave();else if(s.t!=='title')saveGame();
   bgm(s.t==='title'?'title':s.t==='explore'||s.t==='interview'?'survey':s.t==='debate'?'meeting':s.t==='mapplace'?'map':s.t==='sim'?'aid':s.t==='result'?'result':G.chapter<0?'dispatch':BGM.want);
+  setTimeout(()=>tutHook(s),0);
   if(s.t==='title')return title();
   if(s.t==='narr')return talk(null,s.x);
   if(s.t==='say')return talk(s.w,s.x,s.e);
@@ -556,7 +574,7 @@ function title(){
   $('#go').onclick=()=>{G.sc=titleSel;reset();G.i=1;render()};
   $('#so').onclick=()=>{G.sc=titleSel;reset();G.chapter=4;document.querySelector('.hud').hidden=false;hud();simReady(true,G.sc)};
   const rs=$('#rs');if(rs)rs.onclick=resumeGame;
-  $('#tut').onclick=()=>{G.sc='tut';reset();G.i=1;render()};
+  $('#tut').onclick=()=>{TUT.off=false;TUT.seen=new Set();TUT.chap=0;G.sc='tut';reset();G.i=1;render()};
   $('#dj').onclick=dojo;$('#sndt').onclick=()=>setSound(!BGM.on);
   $('#how').onclick=()=>sheet('遊び方',`<ul class="msgs"><li><b>C・S・C・A</b><br>写真で現場を調べて根拠カードを集め、指揮ミーティングで隊員の判断を是正する。最後に拠点を地図に配置する。</li><li><b>T・T・T</b><br>ターン制の救護所シミュレーション。限られた人員・資器材・救急車で傷病者を救う。</li><li><b>トリアージ道場</b><br>START法の60秒仕分け。</li></ul><p class="note">教育用の架空シナリオです。実際の活動は各地域のプロトコル・MCLS標準に従ってください。</p>`,[['閉じる']]);
 }
@@ -597,6 +615,7 @@ function debate(id){
   stage.querySelectorAll('.bul').forEach(b=>b.onclick=()=>{sfx('tap');D.bul=b.dataset.b;stage.querySelectorAll('.bul').forEach(x=>x.classList.toggle('sel',x===b));$('#bulinfo').innerHTML=`<b>${EV[D.bul][0]}</b><span>${EV[D.bul][1]}</span>`});
   $('#nog').onclick=()=>{D.hold=true;clearTimeout(D.tm);
     sheet('根拠がないまま進めますか？','<p>残っている誤りは是正されないまま活動が始まります。現場で集められなかった根拠は、あとから取り戻せません。</p>',[['このまま進める',giveUp],['ミーティングに戻る',()=>{D.hold=false;show(D.idx)}]])};
+  if(G.sc==='tut'){D.paused=true;$('#ps').textContent='▶︎'}
   show(0);
 }
 function show(i){
@@ -2029,6 +2048,32 @@ const STORY_TUT=[
  {t:'sim',id:'tut'},
  {t:'say',w:'oni',e:'a',x:'お疲れさま。これで一通りの流れは終わりだ。あとは本番のシナリオに出場して、判断を磨いてくれ。'},
  {t:'result'}];
+const TUTCOACH={
+ talk:[{sel:'#tk .box',text:'ここをタップして会話を進めよう'}],
+ chapfirst:[{sel:'#ck',text:'章が切り替わった。タップで次へ'}],
+ 'explore:tut':[
+  {sel:'#sc [data-s="oil"]',text:'写真の「気になる所」をタップして調べる。まずはバスの後ろの路面を調べよう'},
+  {sel:'.ov .btns button',text:'説明と、手に入れた根拠カードを読んだら「続ける」'},
+  {sel:'.tray',text:'手に入れた根拠カードはここにたまる。カードをタップすると中身を見返せる',on:'next'},
+  {sel:'#sc [data-s="wire"]',text:'危険はほかにもある。右上の電柱と電線も調べよう'},
+  {sel:'.ov .btns button',text:'読んだら「続ける」'},
+  {sel:'#fin',text:'調べ終えたら、ここで調査を終える'},
+  {sel:'.ov .btns button',text:'「調査を終える」でミーティングへ'}],
+ 'debate:tut_d':[
+  {sel:'#arena',text:'隊員の発言がここに出る。オレンジの言葉が「怪しい所」だ',on:'next'},
+  {sel:'.bul[data-b="ev_fuel"]',text:'まず根拠カードを選ぶ。「路面の油膜」をタップ'},
+  {sel:'#bulinfo',text:'選んだカードの中身はここに出る。読んでから突きつけよう',on:'next'},
+  {sel:'#nx',text:'▶で次の発言へ。タップしよう'},
+  {sel:'.weak[data-w="b"]',text:'「ただの水」が間違いだ！ここをタップして根拠を突きつけろ'},
+  {sel:'.ov .btns button',text:'解説を読んだら、ミーティングを終える'}],
+ 'mapplace:tut':[
+  {sel:'.facs',text:'置く施設はここで選ぶ。いまは「トリアージポスト」が選ばれている',on:'next'},
+  {sel:'[data-slot="D"]',text:'トリアージポストは、危険区域（赤い点線）のすぐ外へ。Dをタップ'},
+  {sel:'[data-slot="F"]',text:'次は救護所。その後ろの広い待避所Fをタップ'},
+  {sel:'#fin',text:'置けたら決定'},
+  {sel:'#nx',text:'評価と模範の配置を確認したら次へ'}],
+ 'sim:tut':[{sel:'#st',text:'準備ができたら救護所を開設しよう。ここからは画面の案内に従って操作する'}]
+};
 SC.tut={n:'チュートリアル',when:'訓練棟・想定訓練',learn:['画面の進め方','根拠カード','是正','救護所の操作'],story:STORY_TUT};
 
 /* ===================== 救護所ガイド ===================== */
@@ -2042,19 +2087,80 @@ const GSTEPS=[
  {on:'next',sel:'.pc .ago:not(:empty)',t:'カード右上の「○分前」は最後に観察した時刻。人が付いていない傷病者は、悪化しても気づけない。定期的に「観察・評価」で見直そう。',btn:'わかった'},
  {on:'next',sel:'#vb',t:'救急車が着いたら「搬送」から送り出す。赤は三次へ。受入の枠には上限がある。ガイドはここまで。',btn:'ガイドを終える'}];
 const GD={on:false,i:0};
+/* ---- スポットライト（ここをタップ） ---- */
+const HAND_SVG='<svg viewBox="0 0 46 56" width="46" height="56"><path d="M17 4c2.8 0 5 2.2 5 5v15l2-.3V20c0-2.6 2-4.6 4.6-4.6S33 17.4 33 20v4.3l1.4.2c.3-2.3 2.2-4 4.5-4 2.6 0 4.6 2 4.6 4.6V40c0 8.8-7.2 16-16 16h-3c-5.3 0-10.1-3.1-12.3-7.9L3.6 33.8c-1.3-2.7.1-5.9 3-6.7 2.2-.6 4.5.5 5.5 2.5L12 30V9c0-2.8 2.2-5 5-5z" fill="#fff" stroke="#1b1b22" stroke-width="2.5" stroke-linejoin="round"/></svg>';
+const SP={spec:null,raf:0,el:null};
+function spot(spec){
+  SP.spec=spec;let o=$('#spot');
+  if(!spec){if(o)o.hidden=true;cancelAnimationFrame(SP.raf);return}
+  if(!o){o=document.createElement('div');o.id='spot';o.innerHTML='<div class="blk" data-b="t"></div><div class="blk" data-b="b"></div><div class="blk" data-b="l"></div><div class="blk" data-b="r"></div><div class="ring"></div><div class="ripple"></div><div class="hand">'+HAND_SVG+'</div><div class="bub" role="status"></div>';document.body.appendChild(o);
+    o.querySelectorAll('.blk').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();const bb=o.querySelector('.bub');bb.classList.remove('shk');void bb.offsetWidth;bb.classList.add('shk')}))}
+  o.hidden=false;
+  const bub=o.querySelector('.bub');
+  bub.innerHTML=`<small>${spec.label||'チュートリアル'}</small>${spec.text}<div class="row"><button type="button" class="sk">${spec.skipText||'スキップ'}</button>${spec.btn?`<button type="button" class="nx">${spec.btn}</button>`:''}</div>`;
+  bub.querySelector('.sk').onclick=()=>{spec.onSkip&&spec.onSkip()};
+  const nx=bub.querySelector('.nx');if(nx)nx.onclick=()=>{sfx('tap');spec.onBtn&&spec.onBtn()};
+  SP.scrolled=false;
+  cancelAnimationFrame(SP.raf);const tick=()=>{spotPlace();SP.raf=requestAnimationFrame(tick)};tick();
+}
+function spotPlace(){
+  const o=$('#spot'),spec=SP.spec;if(!o||!spec)return;
+  const el=spec.sel?document.querySelector(spec.sel):null;SP.el=el;
+  const ov=[...document.querySelectorAll('.ov')].pop();
+  const blocked=el&&ov&&!ov.contains(el);
+  const parts=o.querySelectorAll('.ring,.ripple,.hand,.blk,.bub');
+  if(spec.sel&&(!el||blocked)){parts.forEach(p=>p.style.display='none');return}
+  parts.forEach(p=>p.style.display='');
+  const W=innerWidth,H=innerHeight;
+  if(!el){/* 対象なし：全面を暗くして吹き出しだけ */
+    const [t,b,l,r]=o.querySelectorAll('.blk');Object.assign(t.style,{left:0,top:0,width:W+'px',height:H+'px'});[b,l,r].forEach(x=>x.style.width='0');
+    o.querySelectorAll('.ring,.ripple,.hand').forEach(x=>x.style.display='none');
+    const bub=o.querySelector('.bub');bub.style.top=(H/2-bub.offsetHeight/2)+'px';bub.style.bottom='';return}
+  if(!SP.scrolled){SP.scrolled=true;const r0=el.getBoundingClientRect();if(r0.top<60||r0.bottom>H-20||r0.left<0||r0.right>W)el.scrollIntoView&&el.scrollIntoView({block:'center',inline:'center'})}
+  const r=el.getBoundingClientRect(),pad=6;
+  const x=Math.max(0,r.left-pad),y=Math.max(0,r.top-pad),w=Math.min(W,r.right+pad)-x,h=Math.min(H,r.bottom+pad)-y;
+  const [t,b,l,rr]=o.querySelectorAll('.blk');
+  Object.assign(t.style,{left:0,top:0,width:W+'px',height:y+'px'});
+  Object.assign(b.style,{left:0,top:(y+h)+'px',width:W+'px',height:Math.max(0,H-y-h)+'px'});
+  Object.assign(l.style,{left:0,top:y+'px',width:x+'px',height:h+'px'});
+  Object.assign(rr.style,{left:(x+w)+'px',top:y+'px',width:Math.max(0,W-x-w)+'px',height:h+'px'});
+  o.classList.toggle('free',!!spec.free);
+  Object.assign(o.querySelector('.ring').style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
+  const tap=spec.on!=='next'&&!spec.btn;
+  o.querySelectorAll('.ripple,.hand').forEach(e=>e.style.display=tap?'':'none');
+  const cx=Math.min(r.left+r.width/2,W-40),cy=r.top+Math.min(r.height/2,60);
+  Object.assign(o.querySelector('.ripple').style,{left:cx+'px',top:cy+'px'});
+  Object.assign(o.querySelector('.hand').style,{left:cx+'px',top:cy+'px'});
+  const bub=o.querySelector('.bub'),bh=bub.offsetHeight;
+  if(y+h+bh+24<H){bub.style.top=(y+h+(tap?40:14))+'px';bub.style.bottom=''}else if(y-bh-14>0){bub.style.top=(y-bh-14)+'px';bub.style.bottom=''}else{bub.style.top='';bub.style.bottom='12px'}
+}
+/* クリックで進むステップ */
+document.addEventListener('click',e=>{const sp=SP.spec;if(!sp||sp.on!=='click'||!SP.el)return;if(SP.el.contains(e.target)){const f=sp.onHit;setTimeout(()=>f&&f(),sp.delay||0)}},true);
+
+/* ---- チュートリアル用の段取り ---- */
+const CO={steps:null,i:0,key:null};
+function coach(key,steps){CO.key=key;CO.steps=steps;CO.i=0;coachShow()}
+function coachEnd(){CO.steps=null;if(SP.spec&&SP.spec.owner==='coach')spot(null)}
+function coachShow(){
+  if(!CO.steps)return;const st=CO.steps[CO.i];if(!st)return coachEnd();
+  if(st.pre)st.pre();
+  spot({sel:st.sel,text:st.text,on:st.on||'click',btn:st.on==='next'?(st.btn||'次へ'):null,label:`チュートリアル ${CO.i+1}/${CO.steps.length}`,delay:st.delay,owner:'coach',
+    onHit:()=>{if(CO.steps&&CO.steps[CO.i]===st){CO.i++;setTimeout(coachShow,st.wait||0)}},
+    onBtn:()=>{CO.i++;coachShow()},onSkip:()=>{coachEnd();TUT.off=true}});
+}
+const TUT={off:false,seen:new Set()};
+function tutHook(s){
+  if(G.sc!=='tut'||TUT.off){return}
+  const k=G.i;if(TUT.seen.has(k))return;TUT.seen.add(k);
+  const S=TUTCOACH[s.t+(s.id?':'+s.id:'')]||(k<=2&&(s.t==='say'||s.t==='narr')?TUTCOACH.talk:null)||(s.t==='chap'&&!TUT.chap?(TUT.chap=1,TUTCOACH.chapfirst):null);
+  if(S)setTimeout(()=>coach(k,S),s.t==='explore'||s.t==='debate'?150:30);
+}
 function guideStart(){GD.on=true;GD.i=0;guideShow()}
-function guideEnd(){GD.on=false;const g=$('#guide');g&&g.remove();document.querySelectorAll('.glow').forEach(e=>e.classList.remove('glow'));try{localStorage.setItem('gc-guide','done')}catch(e){}}
+function guideEnd(){GD.on=false;spot(null);try{localStorage.setItem('gc-guide','done')}catch(e){}}
 function guideShow(){
-  document.querySelectorAll('.glow').forEach(e=>e.classList.remove('glow'));
-  let g=$('#guide');if(!GD.on){g&&g.remove();return}
+  if(!GD.on)return;
   const st=GSTEPS[GD.i];if(!st)return guideEnd();
-  if(!g){g=document.createElement('div');g.id='guide';g.setAttribute('role','status');document.body.appendChild(g)}
-  g.innerHTML=`<b>ガイド ${GD.i+1}/${GSTEPS.length}</b><p>${st.t}</p><div class="gbtns">${st.btn?`<button type="button" id="gnext">${st.btn}</button>`:''}<button type="button" class="sk" id="gskip">スキップ</button></div>`;
-  const nb=$('#gnext');if(nb)nb.onclick=()=>{sfx('tap');GD.i++;guideShow()};
-  $('#gskip').onclick=guideEnd;
-  const tg=document.querySelector(st.sel);if(tg)tg.classList.add('glow');
-  g.classList.remove('bot');
-  if(tg){const r=tg.getBoundingClientRect(),gh=g.getBoundingClientRect().height;if(r.top<gh+24)g.classList.add('bot')}
+  spot({sel:st.sel,text:st.t,on:st.btn?'next':'event',btn:st.btn||null,label:`救護所ガイド ${GD.i+1}/${GSTEPS.length}`,onBtn:()=>{GD.i++;guideShow()},onSkip:guideEnd});
 }
 function guide(ev){if(!GD.on)return;const st=GSTEPS[GD.i];if(st&&st.on===ev){GD.i++;setTimeout(guideShow,ev==='turn'?50:0)}else setTimeout(guideShow,0)}
 
