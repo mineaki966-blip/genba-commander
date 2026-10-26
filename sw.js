@@ -1,5 +1,5 @@
 /* 現場コマンダー サービスワーカー：一度開けばオフラインでも遊べる */
-const VER='gc-v3';
+const VER='gc-v4';
 const CORE=["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "img/bosai_n.webp", "img/cmd_n.webp", "img/cond_n.webp", "img/drv_n.webp", "img/mak_n.webp", "img/oni_a.webp", "img/oni_n.webp", "img/oni_s.webp", "img/safe_n.webp", "img/sakaki_n.webp", "img/sakura_a.webp", "img/sakura_n.webp", "img/sakura_s.webp", "img/scene_bus.webp", "img/scene_chem.webp", "img/scene_fire.webp", "img/scene_hwy.webp", "img/scene_train.webp", "img/tad_n.webp", "img/trk_n.webp"];
 const BGM_LIST=["bgm/A_Map_of_Intent.mp3", "bgm/Calculated_Momentum.mp3", "bgm/Critical_Path.mp3", "bgm/The_Steady_Hand.mp3", "bgm/The_Weight_of_a_Breath.mp3", "bgm/Unsolved_Presence.mp3", "bgm/Where_the_Storm_Settles.mp3"];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(VER).then(c=>c.addAll(CORE)))});

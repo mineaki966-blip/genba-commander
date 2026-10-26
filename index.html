@@ -372,6 +372,9 @@ button:focus-visible{outline:3px solid var(--weak);outline-offset:2px}
 #spot .bub .sk{background:none;border:0;color:#6a6656;text-decoration:underline;font-size:12px;padding:2px}
 #spot .bub .nx{background:var(--siren);color:#fff;border:0;border-radius:6px;padding:7px 16px;font-weight:700;font-size:14px}
 #spot .bub.shk{animation:shake .35s}
+body.tutmode .coach,body.tutmode .explore>p.guide,body.tutmode .debate>.guide,body.tutmode .ready ul,body.tutmode .gchk,body.tutmode .ready .ghost{display:none}
+#spot .bub{font-size:17px;text-align:center}
+#spot .bub .row{justify-content:center;gap:16px}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 
@@ -512,7 +515,7 @@ function hud(){
   $('#evbtn').textContent='根拠カード '+G.ev.size;
 }
 function setChap(c){if(c>G.chapter){G.chapter=c;hud()}}
-function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;const sp=document.getElementById('spot');e.style.zIndex=60;e.style.top=sp&&!sp.hidden?'auto':'';e.style.bottom=sp&&!sp.hidden?'calc(16px + env(safe-area-inset-bottom,0px))':'';clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2000)}
+function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;const sp=document.getElementById('spot');e.style.zIndex=60;e.style.top=sp&&!sp.hidden?'calc(8px + env(safe-area-inset-top,0px))':'';e.style.bottom='';e.style.pointerEvents='none';clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2000)}
 function stamp(t){sfx('stamp');setTimeout(()=>{const f=document.createElement('div');f.className='hitflash';document.body.appendChild(f);setTimeout(()=>f.remove(),450);const a=document.getElementById('app');a.classList.remove('shake');void a.offsetWidth;a.classList.add('shake')},220);const e=$('#stamp');e.innerHTML=`<span>${t}</span>`;e.hidden=false;setTimeout(()=>e.hidden=true,1100)}
 function sheet(h,body,btns){
   const ov=document.createElement('div');ov.className='ov';
@@ -538,6 +541,7 @@ function render(){
   const s=SC[G.sc].story[G.i];hud();stage.scrollTop=0;
   if(s.t==='result')clearSave();else if(s.t!=='title')saveGame();
   bgm(s.t==='title'?'title':s.t==='explore'||s.t==='interview'?'survey':s.t==='debate'?'meeting':s.t==='mapplace'?'map':s.t==='sim'?'aid':s.t==='result'?'result':G.chapter<0?'dispatch':BGM.want);
+  document.body.classList.toggle('tutmode',G.sc==='tut');
   setTimeout(()=>tutHook(s),0);
   if(s.t==='title')return title();
   if(s.t==='narr')return talk(null,s.x);
@@ -1352,7 +1356,7 @@ function finishSort(){
 function result(){
   if(G.sc==='tut'){G.chapter=7;hud();clearSave();try{localStorage.setItem('gc-tut','done')}catch(e){}
     stage.innerHTML=`<div class="result" style="margin:auto 0"><span class="note">チュートリアル完了</span><h2 style="font-family:var(--f-display);font-weight:400;font-size:32px;margin:0">準備完了</h2>
-     <ul class="msgs"><li>現場調査：写真をタップして根拠カードを集める</li><li>指揮ミーティング：カードを選んで、オレンジの言葉をタップ</li><li>配置マップ：施設を選んで地図の丸に置く</li><li>救護所：観察→タグ→処置→ターン終了→搬送</li></ul>
+     <ul class="msgs"><li>調べる → カードを集める</li><li>カードで、オレンジの言葉を是正</li><li>拠点を地図に置く</li><li>救護所：タグ → 処置 → 搬送</li></ul>
      <div class="btns"><button class="primary" id="tt" type="button">シナリオを選んで出場する</button></div></div>`;
     $('#tt').onclick=()=>{G.sc='bus';titleSel='bus';reset();G.i=0;render()};return}
   setTimeout(()=>sfx('rank'),200);
@@ -2030,62 +2034,54 @@ SIMS.tut={...SIMS.bus,start:[10,0],maxT:6,pts:()=>busPatients().filter(p=>['A','
  tip:'練習用の小さな救護所。傷病者4名、12分間。ガイドに従って「観察→タグ→処置→ターン終了→搬送」の流れを体験しよう。'};
 const STORY_TUT=[
  {t:'title'},
- {t:'narr',x:'訓練棟。今日は多数傷病者対応の想定訓練だ。'},
- {t:'say',w:'oni',x:'教官役の大西だ。この画面は、文字のところをタップすると進む。'},
- {t:'say',w:'oni',e:'a',x:'多数傷病者事故（MCI）の活動は、CSCATTTの順で考える。画面上の文字がその7つだ。今日は要点だけ体験しよう。'},
- {t:'chap',i:1,s:'まずは自分たちの安全から',m:'現場調査 → 指揮ミーティング'},
- {t:'say',w:'oni',x:'最初は現場調査だ。想定の現場写真を見て、危険がないか確かめてくれ。'},
+ {t:'narr',x:'訓練棟。今日は想定訓練だ。'},
+ {t:'say',w:'oni',x:'教官の大西だ。順番にやってみよう。'},
+ {t:'chap',i:1,s:'まず安全を確認',m:'現場調査'},
  {t:'explore',id:'tut'},
  {t:'say',w:'sak',e:'a',x:'隊長、すぐ車内に入りましょう！'},
- {t:'say',w:'oni',x:'待て。今の佐倉の判断に誤りがないか、指揮ミーティングで確かめる。集めた根拠カードを使ってくれ。'},
+ {t:'say',w:'oni',x:'その判断、根拠カードで正せ。'},
  {t:'debate',id:'tut_d'},
- {t:'say',w:'oni',e:'a',x:'そうだ。根拠を示して判断を正す。これが「是正」だ。本番では誤りが3つ、4つ混ざっている。'},
- {t:'chap',i:3,s:'活動の拠点をどこに置くか',m:'配置マップ'},
- {t:'say',w:'oni',x:'次は拠点の配置だ。今日はトリアージポストと救護所の2つだけ置いてみよう。'},
+ {t:'say',w:'oni',e:'a',x:'それが「是正」だ。'},
+ {t:'chap',i:3,s:'拠点を置く',m:'配置マップ'},
  {t:'mapplace',id:'tut'},
- {t:'chap',i:4,s:'限られた人と物で、救護所を回す',m:'救護所シミュレーション'},
- {t:'say',w:'oni',x:'最後は救護所だ。人も資器材も足りない中で、誰に何をするかを決める。ガイドが出るから、その通りに進めてみよう。'},
+ {t:'chap',i:4,s:'救護所を回す',m:'救護所'},
  {t:'sim',id:'tut'},
- {t:'say',w:'oni',e:'a',x:'お疲れさま。これで一通りの流れは終わりだ。あとは本番のシナリオに出場して、判断を磨いてくれ。'},
+ {t:'say',w:'oni',e:'a',x:'お疲れさま。本番に出場しよう。'},
  {t:'result'}];
 const TUTCOACH={
- talk:[{sel:'#tk .box',text:'ここをタップして会話を進めよう'}],
- chapfirst:[{sel:'#ck',text:'章が切り替わった。タップで次へ'}],
+ talk:[{sel:'#tk .box',text:'タップで進む'}],
+ chapfirst:[{sel:'#ck',text:'タップ'}],
  'explore:tut':[
-  {sel:'#sc [data-s="oil"]',text:'写真の「気になる所」をタップして調べる。まずはバスの後ろの路面を調べよう'},
-  {sel:'.ov .btns button',text:'説明と、手に入れた根拠カードを読んだら「続ける」'},
-  {sel:'.tray',text:'手に入れた根拠カードはここにたまる。カードをタップすると中身を見返せる',on:'next'},
-  {sel:'#sc [data-s="wire"]',text:'危険はほかにもある。右上の電柱と電線も調べよう'},
-  {sel:'.ov .btns button',text:'読んだら「続ける」'},
-  {sel:'#fin',text:'調べ終えたら、ここで調査を終える'},
-  {sel:'.ov .btns button',text:'「調査を終える」でミーティングへ'}],
+  {sel:'#sc [data-s="oil"]',text:'気になる所をタップ'},
+  {sel:'.ov .btns button',area:'.ov .sheet',text:'根拠カードを入手！'},
+  {sel:'#sc [data-s="wire"]',text:'ここも調べよう'},
+  {sel:'.ov .btns button',area:'.ov .sheet',text:'続ける'},
+  {sel:'#fin',text:'調べ終えたらここ'},
+  {sel:'.ov .btns button',area:'.ov .sheet',text:'ミーティングへ'}],
  'debate:tut_d':[
-  {sel:'#arena',text:'隊員の発言がここに出る。オレンジの言葉が「怪しい所」だ',on:'next'},
-  {sel:'.bul[data-b="ev_fuel"]',text:'まず根拠カードを選ぶ。「路面の油膜」をタップ'},
-  {sel:'#bulinfo',text:'選んだカードの中身はここに出る。読んでから突きつけよう',on:'next'},
-  {sel:'#nx',text:'▶で次の発言へ。タップしよう'},
-  {sel:'.weak[data-w="b"]',text:'「ただの水」が間違いだ！ここをタップして根拠を突きつけろ'},
-  {sel:'.ov .btns button',text:'解説を読んだら、ミーティングを終える'}],
+  {sel:'.bul[data-b="ev_fuel"]',text:'カードを選ぶ'},
+  {sel:'#nx',text:'次の発言へ'},
+  {sel:'.weak[data-w="b"]',text:'間違いはここ！タップ'},
+  {sel:'.ov .btns button',area:'.ov .sheet',text:'是正できた！'}],
  'mapplace:tut':[
-  {sel:'.facs',text:'置く施設はここで選ぶ。いまは「トリアージポスト」が選ばれている',on:'next'},
-  {sel:'[data-slot="D"]',text:'トリアージポストは、危険区域（赤い点線）のすぐ外へ。Dをタップ'},
-  {sel:'[data-slot="F"]',text:'次は救護所。その後ろの広い待避所Fをタップ'},
-  {sel:'#fin',text:'置けたら決定'},
-  {sel:'#nx',text:'評価と模範の配置を確認したら次へ'}],
- 'sim:tut':[{sel:'#st',text:'準備ができたら救護所を開設しよう。ここからは画面の案内に従って操作する'}]
+  {sel:'[data-slot="D"]',text:'トリアージはここ'},
+  {sel:'[data-slot="F"]',text:'救護所はここ'},
+  {sel:'#fin',text:'決定'},
+  {sel:'#nx',text:'次へ'}],
+ 'sim:tut':[{sel:'#st',text:'開設'}]
 };
 SC.tut={n:'チュートリアル',when:'訓練棟・想定訓練',learn:['画面の進め方','根拠カード','是正','救護所の操作'],story:STORY_TUT};
 
 /* ===================== 救護所ガイド ===================== */
 const GSTEPS=[
- {on:'open',sel:'.pc',t:'まず傷病者のカードをタップして、詳しく観察しよう。いちばん上の「未判定」から見ていくのが基本。'},
- {on:'tag',sel:'.tagbtns',t:'バイタルと所見を見てタグを付けよう。迷ったら画面下の「基準」で判定基準を確認できる。'},
- {on:'act',sel:'.acts',t:'次に処置を指示しよう。赤なら気道確保・止血・酸素など。空いている人員が資格の低い順に自動で割り当たる。灰色の項目は、理由が下に書いてある。'},
- {on:'close',sel:'#pclose',t:'指示を出したら「救護所に戻る」。ほかの傷病者も同じように、観察→タグ→処置を回そう。'},
- {on:'next',sel:'.rrow',t:'上の列が、いま空いている人員と資器材の数。全員に手は回らない。誰に人を付けるかが判断のしどころ。',btn:'わかった'},
- {on:'turn',sel:'#eb',t:'指示を出し終えたら「ターン終了」。2分進み、処置の結果や容態の変化が報告される。'},
- {on:'next',sel:'.pc .ago:not(:empty)',t:'カード右上の「○分前」は最後に観察した時刻。人が付いていない傷病者は、悪化しても気づけない。定期的に「観察・評価」で見直そう。',btn:'わかった'},
- {on:'next',sel:'#vb',t:'救急車が着いたら「搬送」から送り出す。赤は三次へ。受入の枠には上限がある。ガイドはここまで。',btn:'ガイドを終える'}];
+ {on:'open',sel:'.pc',t:'傷病者をタップ'},
+ {on:'tag',sel:'.tagbtns',t:'タグを付ける'},
+ {on:'act',sel:'.acts',t:'処置を選ぶ'},
+ {on:'close',sel:'#pclose',t:'戻る'},
+ {on:'next',sel:'.rrow',t:'空いている人と物の数',btn:'OK'},
+ {on:'turn',sel:'#eb',t:'ターン終了（2分進む）'},
+ {on:'next',sel:'.pc .ago:not(:empty)',t:'最後に見た時刻。古いほど危ない',btn:'OK'},
+ {on:'next',sel:'#vb',t:'救急車が来たらここで搬送',btn:'終わり'}];
 const GD={on:false,i:0};
 /* ---- スポットライト（ここをタップ） ---- */
 const HAND_SVG='<svg viewBox="0 0 46 56" width="46" height="56"><path d="M17 4c2.8 0 5 2.2 5 5v15l2-.3V20c0-2.6 2-4.6 4.6-4.6S33 17.4 33 20v4.3l1.4.2c.3-2.3 2.2-4 4.5-4 2.6 0 4.6 2 4.6 4.6V40c0 8.8-7.2 16-16 16h-3c-5.3 0-10.1-3.1-12.3-7.9L3.6 33.8c-1.3-2.7.1-5.9 3-6.7 2.2-.6 4.5.5 5.5 2.5L12 30V9c0-2.8 2.2-5 5-5z" fill="#fff" stroke="#1b1b22" stroke-width="2.5" stroke-linejoin="round"/></svg>';
@@ -2117,7 +2113,8 @@ function spotPlace(){
     o.querySelectorAll('.ring,.ripple,.hand').forEach(x=>x.style.display='none');
     const bub=o.querySelector('.bub');bub.style.top=(H/2-bub.offsetHeight/2)+'px';bub.style.bottom='';return}
   if(!SP.scrolled){SP.scrolled=true;const r0=el.getBoundingClientRect();if(r0.top<60||r0.bottom>H-20||r0.left<0||r0.right>W)el.scrollIntoView&&el.scrollIntoView({block:'center',inline:'center'})}
-  const r=el.getBoundingClientRect(),pad=6;
+  const hole=(spec.area&&document.querySelector(spec.area))||el;
+  const r=hole.getBoundingClientRect(),pad=6;const re=el.getBoundingClientRect();
   const x=Math.max(0,r.left-pad),y=Math.max(0,r.top-pad),w=Math.min(W,r.right+pad)-x,h=Math.min(H,r.bottom+pad)-y;
   const [t,b,l,rr]=o.querySelectorAll('.blk');
   Object.assign(t.style,{left:0,top:0,width:W+'px',height:y+'px'});
@@ -2128,11 +2125,11 @@ function spotPlace(){
   Object.assign(o.querySelector('.ring').style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
   const tap=spec.on!=='next'&&!spec.btn;
   o.querySelectorAll('.ripple,.hand').forEach(e=>e.style.display=tap?'':'none');
-  const cx=Math.min(r.left+r.width/2,W-40),cy=r.top+Math.min(r.height/2,60);
+  const cx=Math.min(re.left+re.width/2,W-40),cy=re.top+Math.min(re.height/2,60);
   Object.assign(o.querySelector('.ripple').style,{left:cx+'px',top:cy+'px'});
   Object.assign(o.querySelector('.hand').style,{left:cx+'px',top:cy+'px'});
   const bub=o.querySelector('.bub'),bh=bub.offsetHeight;
-  if(y+h+bh+24<H){bub.style.top=(y+h+(tap?40:14))+'px';bub.style.bottom=''}else if(y-bh-14>0){bub.style.top=(y-bh-14)+'px';bub.style.bottom=''}else{bub.style.top='';bub.style.bottom='12px'}
+  if(y+h+bh+24<H){bub.style.top=(y+h+(tap?40:14))+'px';bub.style.bottom=''}else if(y-bh-14>0){bub.style.top=(y-bh-14)+'px';bub.style.bottom=''}else{bub.style.top=(spec.area?Math.max(8,y-bh-8):'')+'px';if(!spec.area){bub.style.top='';bub.style.bottom='12px'}}
 }
 /* クリックで進むステップ */
 document.addEventListener('click',e=>{const sp=SP.spec;if(!sp||sp.on!=='click'||!SP.el)return;if(SP.el.contains(e.target)){const f=sp.onHit;setTimeout(()=>f&&f(),sp.delay||0)}},true);
@@ -2144,7 +2141,7 @@ function coachEnd(){CO.steps=null;if(SP.spec&&SP.spec.owner==='coach')spot(null)
 function coachShow(){
   if(!CO.steps)return;const st=CO.steps[CO.i];if(!st)return coachEnd();
   if(st.pre)st.pre();
-  spot({sel:st.sel,text:st.text,on:st.on||'click',btn:st.on==='next'?(st.btn||'次へ'):null,label:`チュートリアル ${CO.i+1}/${CO.steps.length}`,delay:st.delay,owner:'coach',
+  spot({sel:st.sel,area:st.area,text:st.text,on:st.on||'click',btn:st.on==='next'?(st.btn||'次へ'):null,label:`チュートリアル ${CO.i+1}/${CO.steps.length}`,delay:st.delay,owner:'coach',
     onHit:()=>{if(CO.steps&&CO.steps[CO.i]===st){CO.i++;setTimeout(coachShow,st.wait||0)}},
     onBtn:()=>{CO.i++;coachShow()},onSkip:()=>{coachEnd();TUT.off=true}});
 }
